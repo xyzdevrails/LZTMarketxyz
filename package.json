@@ -1,0 +1,45 @@
+{
+  "name": "lztmarket-discord-bot",
+  "version": "1.0.0",
+  "description": "Bot Discord para vendas de contas Valorant via LZT Market",
+  "main": "dist/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test-api": "ts-node src/test-api.ts",
+    "test-simple": "ts-node src/test-api-simple.ts",
+    "test-endpoints": "ts-node src/test-endpoints.ts",
+    "test-valorant": "ts-node src/test-valorant-endpoint.ts",
+    "test-user": "ts-node src/test-user-accounts.ts",
+    "test-search": "ts-node src/test-market-search.ts",
+    "test-list": "ts-node src/test-list-accounts.ts",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "valorant",
+    "lzt-market"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "axios": "^1.6.5",
+    "dotenv": "^16.3.1",
+    "bottleneck": "^2.19.5",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/uuid": "^9.0.7",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "eslint": "^8.56.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
+  }
+}
+
