@@ -145,6 +145,16 @@ export class EfiService {
       logger.info(`[EFI]   - Valor: R$ ${params.valor} (${Math.round(params.valor * 100)} centavos)`);
       logger.info(`[EFI]   - TXID: ${params.txid || 'Será gerado pela EfiBank'}`);
       
+      // Valida e obtém chave PIX (obrigatória)
+      const pixKey = params.chave || process.env.EFI_PIX_KEY;
+      if (!pixKey) {
+        const errorMsg = 'Chave PIX não configurada. Configure EFI_PIX_KEY no Railway ou forneça via parâmetro.';
+        logger.error(`[EFI] ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+      
+      logger.info(`[EFI]   - Chave PIX: ${pixKey.substring(0, 10)}...${pixKey.substring(pixKey.length - 4)}`);
+      
       const valorEmCentavos = Math.round(params.valor * 100);
 
       const chargeData: any = {
@@ -154,7 +164,7 @@ export class EfiService {
         valor: {
           original: valorEmCentavos.toFixed(2),
         },
-        chave: params.chave || process.env.EFI_PIX_KEY, // Chave PIX padrão se não informada
+        chave: pixKey, // Chave PIX (obrigatória)
       };
 
       if (params.solicitacaoPagador) {

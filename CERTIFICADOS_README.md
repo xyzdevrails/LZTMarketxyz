@@ -16,6 +16,7 @@ EFI_SANDBOX=true
 EFI_CLIENT_ID=Client_Id_89f7c76497d583d6f617b3624d850cc2154d9a45
 EFI_CLIENT_SECRET=Client_Secret_6cabf14f5b5a0ce35ea795a5a548ded121315232
 EFI_CERTIFICATE_BASE64=<cole_o_conteudo_de_certificado-homologacao_base64.txt>
+EFI_PIX_KEY=<sua_chave_pix_aqui>
 ```
 
 ### Para PRODUÇÃO:
@@ -25,7 +26,14 @@ EFI_SANDBOX=false
 EFI_CLIENT_ID=<suas_credenciais_de_producao>
 EFI_CLIENT_SECRET=<suas_credenciais_de_producao>
 EFI_CERTIFICATE_BASE64=<cole_o_conteudo_de_certificado-producao_base64.txt>
+EFI_PIX_KEY=<sua_chave_pix_de_producao>
 ```
+
+### ⚠️ Variáveis Obrigatórias:
+
+- `EFI_PIX_KEY` - **OBRIGATÓRIA**: Sua chave PIX (CPF, CNPJ, email, telefone ou chave aleatória)
+  - Exemplo: `12345678900` (CPF), `contato@exemplo.com` (email), ou chave aleatória da EfiBank
+  - Você pode encontrar/criar sua chave PIX no painel da EfiBank: https://app.sejaefi.com.br/
 
 ## 📝 Como Copiar o Base64
 
