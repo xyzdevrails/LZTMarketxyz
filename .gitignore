@@ -36,6 +36,8 @@ purchase_logs.json
 certs/
 temp_certificado.p12
 certificado_base64.txt
+certificado_base64_limpo.txt
+*_base64.txt
 
 # Gradle (if exists)
 .gradle/
