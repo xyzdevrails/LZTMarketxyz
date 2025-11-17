@@ -250,24 +250,59 @@ export class EfiService {
    * Gera QR Code de uma cobrança usando Location ID
    * Documentação: https://dev.efipay.com.br/docs/api-pix/payload-locations
    */
-  async generateQRCode(locationId: number): Promise<{
+  async generateQRCode(locationId: number | string): Promise<{
     qrcode: string; // QR Code em base64 ou texto
     imagemQrcode?: string; // URL da imagem do QR Code (se disponível)
   }> {
     try {
-      logger.info(`Gerando QR Code para location: ${locationId}`);
+      // Garante que locationId seja um número (a API pode retornar string)
+      const locationIdNumber = typeof locationId === 'string' ? parseInt(locationId, 10) : locationId;
       
-      const response = await this.efipay.pixGenerateQRCode({ id: locationId });
+      if (isNaN(locationIdNumber)) {
+        throw new Error(`Location ID inválido: ${locationId}`);
+      }
+      
+      logger.info(`[EFI] Gerando QR Code para location: ${locationIdNumber} (tipo: ${typeof locationId})`);
+      
+      const response = await this.efipay.pixGenerateQRCode({ id: locationIdNumber });
 
-      logger.info('QR Code gerado com sucesso');
+      logger.info('[EFI] QR Code gerado com sucesso');
+      
+      if (!response.qrcode) {
+        throw new Error('QR Code não retornado pela API da EfiBank');
+      }
       
       return {
         qrcode: response.qrcode,
         imagemQrcode: response.imagemQrcode,
       };
     } catch (error: any) {
-      logger.error('Erro ao gerar QR Code', error);
-      throw new Error(`Erro ao gerar QR Code: ${error.message || error}`);
+      logger.error('[EFI] Erro ao gerar QR Code', error);
+      logger.error('[EFI] Detalhes do erro:', JSON.stringify(error, null, 2));
+      
+      // Extrai mensagem de erro de forma mais robusta
+      let errorMessage = 'Erro desconhecido ao gerar QR Code';
+      
+      if (error) {
+        if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        } else if (error.error) {
+          errorMessage = typeof error.error === 'string' ? error.error : JSON.stringify(error.error);
+        } else if (error.nome || error.mensagem) {
+          // Formato de erro da EfiBank
+          errorMessage = `${error.nome || 'Erro'}: ${error.mensagem || JSON.stringify(error)}`;
+        } else {
+          try {
+            errorMessage = JSON.stringify(error);
+          } catch (e) {
+            errorMessage = String(error);
+          }
+        }
+      }
+      
+      throw new Error(`Erro ao gerar QR Code: ${errorMessage}`);
     }
   }
 

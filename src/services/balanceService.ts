@@ -43,7 +43,14 @@ export class BalanceService {
       });
 
       // Gera QR Code
-      const qrCodeData = await this.efiService.generateQRCode(charge.location);
+      let qrCodeData;
+      try {
+        qrCodeData = await this.efiService.generateQRCode(charge.location);
+      } catch (qrError: any) {
+        logger.error('Erro ao gerar QR Code após criar cobrança', qrError);
+        // Se falhar ao gerar QR Code, ainda retorna sucesso mas com erro específico
+        throw new Error(`Cobrança criada com sucesso, mas falhou ao gerar QR Code: ${qrError.message || qrError}`);
+      }
 
       // Obtém chave PIX (da cobrança ou configuração)
       const pixKey = charge.chave || process.env.EFI_PIX_KEY || 'Chave PIX não configurada';
