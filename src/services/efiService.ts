@@ -16,7 +16,17 @@ export class EfiService {
     const clientSecret = process.env.EFI_CLIENT_SECRET;
     const certificatePath = process.env.EFI_CERTIFICATE_PATH || './certs/certificado.p12';
     const certificateBase64 = process.env.EFI_CERTIFICATE_BASE64;
-    this.sandbox = process.env.EFI_SANDBOX === 'true';
+    const sandboxEnv = process.env.EFI_SANDBOX;
+    this.sandbox = sandboxEnv === 'true';
+
+    // Log de diagnóstico
+    logger.info(`[EFI] Configuração detectada:`);
+    logger.info(`[EFI] EFI_SANDBOX (raw): "${sandboxEnv}"`);
+    logger.info(`[EFI] EFI_SANDBOX (parsed): ${this.sandbox} (${this.sandbox ? 'SANDBOX' : 'PRODUÇÃO'})`);
+    logger.info(`[EFI] EFI_CLIENT_ID: ${clientId ? `${clientId.substring(0, 10)}...` : 'NÃO CONFIGURADO'}`);
+    logger.info(`[EFI] EFI_CLIENT_SECRET: ${clientSecret ? 'CONFIGURADO' : 'NÃO CONFIGURADO'}`);
+    logger.info(`[EFI] EFI_CERTIFICATE_BASE64: ${certificateBase64 ? `SIM (${certificateBase64.length} chars)` : 'NÃO CONFIGURADO'}`);
+    logger.info(`[EFI] EFI_CERTIFICATE_PATH: ${certificatePath}`);
 
     if (!clientId || !clientSecret) {
       throw new Error('EFI_CLIENT_ID e EFI_CLIENT_SECRET são obrigatórios');
@@ -92,12 +102,21 @@ export class EfiService {
     }
 
     try {
-      logger.info(`Inicializando EfiPay com sandbox=${this.sandbox}, certificado=${finalCertPath}`);
+      logger.info(`[EFI] Inicializando EfiPay:`);
+      logger.info(`[EFI]   - sandbox: ${this.sandbox} (${this.sandbox ? 'SANDBOX' : 'PRODUÇÃO'})`);
+      logger.info(`[EFI]   - certificado: ${finalCertPath}`);
+      logger.info(`[EFI]   - certificado existe: ${fs.existsSync(finalCertPath)}`);
+      if (fs.existsSync(finalCertPath)) {
+        const certStats = fs.statSync(finalCertPath);
+        logger.info(`[EFI]   - tamanho do certificado: ${certStats.size} bytes`);
+      }
+      logger.info(`[EFI]   - senha do certificado: ${process.env.EFI_CERTIFICATE_PASSWORD ? 'CONFIGURADA' : 'NÃO CONFIGURADA'}`);
+      
       this.efipay = new EfiPay(options);
-      logger.info(`EfiService inicializado com sucesso (sandbox: ${this.sandbox})`);
+      logger.info(`[EFI] EfiService inicializado com sucesso (sandbox: ${this.sandbox})`);
     } catch (error: any) {
-      logger.error('Erro ao inicializar EfiPay:', error);
-      logger.error('Opções usadas:', JSON.stringify({ ...options, certificate: '[REDACTED]' }, null, 2));
+      logger.error('[EFI] Erro ao inicializar EfiPay:', error);
+      logger.error('[EFI] Opções usadas:', JSON.stringify({ ...options, certificate: '[REDACTED]', client_secret: '[REDACTED]' }, null, 2));
       throw new Error(`Erro ao inicializar EfiPay: ${error.message || 'Erro desconhecido'}`);
     }
   }
@@ -120,6 +139,12 @@ export class EfiService {
     solicitacaoPagador?: string;
   }> {
     try {
+      // Log de diagnóstico antes de criar cobrança
+      logger.info(`[EFI] Criando cobrança PIX:`);
+      logger.info(`[EFI]   - Ambiente: ${this.sandbox ? 'SANDBOX' : 'PRODUÇÃO'}`);
+      logger.info(`[EFI]   - Valor: R$ ${params.valor} (${Math.round(params.valor * 100)} centavos)`);
+      logger.info(`[EFI]   - TXID: ${params.txid || 'Será gerado pela EfiBank'}`);
+      
       const valorEmCentavos = Math.round(params.valor * 100);
 
       const chargeData: any = {
@@ -189,11 +214,22 @@ export class EfiService {
         errorMessage += `- EFI_CLIENT_SECRET está correto?\n`;
         errorMessage += `- EFI_SANDBOX=${this.sandbox} corresponde às credenciais?\n`;
         errorMessage += `- As credenciais são do ambiente ${this.sandbox ? 'SANDBOX' : 'PRODUÇÃO'}?`;
-      } else if (errorMessage.includes('sandbox') || errorMessage.includes('certificate')) {
-        errorMessage += '\n\n💡 Dica: Verifique se o certificado corresponde ao ambiente configurado:\n';
-        errorMessage += `- Certificado de PRODUÇÃO deve ter EFI_SANDBOX=false\n`;
-        errorMessage += `- Certificado de SANDBOX deve ter EFI_SANDBOX=true\n`;
-        errorMessage += `- Configuração atual: EFI_SANDBOX=${this.sandbox}`;
+      } else if (errorMessage.includes('sandbox') || errorMessage.includes('certificate') || errorMessage.includes('atributo')) {
+        errorMessage = '❌ **Erro de configuração: Certificado e ambiente não correspondem**\n\n';
+        errorMessage += '🔍 **Diagnóstico:**\n';
+        errorMessage += `- Ambiente configurado: ${this.sandbox ? 'SANDBOX' : 'PRODUÇÃO'}\n`;
+        errorMessage += `- EFI_SANDBOX=${process.env.EFI_SANDBOX}\n\n`;
+        errorMessage += '💡 **Solução:**\n';
+        errorMessage += `1. Se você tem certificado de **PRODUÇÃO**:\n`;
+        errorMessage += `   → Configure \`EFI_SANDBOX=false\` no Railway\n`;
+        errorMessage += `   → Use credenciais de **PRODUÇÃO**\n\n`;
+        errorMessage += `2. Se você tem certificado de **SANDBOX**:\n`;
+        errorMessage += `   → Configure \`EFI_SANDBOX=true\` no Railway\n`;
+        errorMessage += `   → Use credenciais de **SANDBOX**\n\n`;
+        errorMessage += `3. Verifique também:\n`;
+        errorMessage += `   → O certificado está correto?\n`;
+        errorMessage += `   → As credenciais (CLIENT_ID e CLIENT_SECRET) correspondem ao ambiente?\n`;
+        errorMessage += `   → O certificado tem senha? Configure \`EFI_CERTIFICATE_PASSWORD\` se necessário\n`;
       }
       
       throw new Error(`Erro ao criar cobrança PIX: ${errorMessage}`);
