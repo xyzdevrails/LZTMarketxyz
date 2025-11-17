@@ -26,14 +26,14 @@ export async function execute(
   await interaction.deferReply({ ephemeral: true });
 
   try {
-    const valor = interaction.options.getNumber('valor', true);
+    const valorString = interaction.options.getString('valor', true);
     const userId = interaction.user.id;
 
-    // Valida formato do valor (sem zeros à esquerda)
-    const valorString = valor.toString();
+    // Remove espaços e converte vírgula para ponto
+    const valorLimpo = valorString.trim().replace(',', '.');
     
-    // Verifica se tem zeros à esquerda (ex: 0001, 000001)
-    if (valorString.match(/^0+[1-9]/) || valorString.match(/^0+0/)) {
+    // Verifica se tem zeros à esquerda (ex: 0001, 000001, 0000)
+    if (valorLimpo.match(/^0+[1-9]/) || valorLimpo.match(/^0+0+$/)) {
       await interaction.editReply({
         content: '❌ **Formato inválido!**\n\n' +
           `Você digitou: \`${valorString}\`\n\n` +
@@ -45,21 +45,36 @@ export async function execute(
       });
       return;
     }
-
-    // Valida valor mínimo
-    if (valor < 1) {
+    
+    // Verifica se é um número válido
+    const valor = parseFloat(valorLimpo);
+    
+    if (isNaN(valor)) {
       await interaction.editReply({
-        content: '❌ Valor mínimo é R$ 1,00',
+        content: '❌ **Valor inválido!**\n\n' +
+          `Você digitou: \`${valorString}\`\n\n` +
+          'Por favor, informe um número válido.\n' +
+          '✅ Exemplos: `1`, `10`, `50`, `100`, `1.50`, `10.99`',
       });
       return;
     }
     
-    // Valida se o valor é um número válido e positivo
-    if (isNaN(valor) || valor <= 0) {
+    // Valida valor mínimo
+    if (valor < 1) {
+      await interaction.editReply({
+        content: '❌ **Valor mínimo é R$ 1,00**\n\n' +
+          `Você informou: R$ ${valor.toFixed(2)}\n\n` +
+          'Por favor, informe um valor igual ou maior que R$ 1,00.',
+      });
+      return;
+    }
+    
+    // Valida se o valor é positivo
+    if (valor <= 0) {
       await interaction.editReply({
         content: '❌ **Valor inválido!**\n\n' +
-          'Por favor, informe um valor válido maior que zero.\n' +
-          'Exemplo: `1`, `10`, `50`, `100`',
+          'Por favor, informe um valor maior que zero.\n' +
+          '✅ Exemplos: `1`, `10`, `50`, `100`',
       });
       return;
     }
