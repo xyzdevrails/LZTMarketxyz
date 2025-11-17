@@ -11,12 +11,11 @@ import QRCode from 'qrcode';
 export const data = new SlashCommandBuilder()
   .setName('adicionarsaldo')
   .setDescription('Adiciona saldo à sua conta via PIX')
-  .addNumberOption(option =>
+  .addStringOption(option =>
     option
       .setName('valor')
-      .setDescription('Valor em reais para adicionar (mínimo: R$ 1,00)')
+      .setDescription('Valor em reais para adicionar (mínimo: R$ 1,00). Exemplo: 1, 10, 50, 100')
       .setRequired(true)
-      .setMinValue(1)
   );
 
 export async function execute(
