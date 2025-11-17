@@ -85,11 +85,20 @@ export async function execute(
       logger.warn('Erro ao gerar imagem do QR Code, usando texto', qrError);
     }
 
+    // Verifica se está em sandbox
+    const isSandbox = process.env.EFI_SANDBOX === 'true';
+    
     // Cria embed com informações
     const embed = new EmbedBuilder()
       .setTitle('💰 Adicionar Saldo via PIX')
-      .setColor(0x00ff00)
+      .setColor(isSandbox ? 0xffaa00 : 0x00ff00) // Laranja para sandbox, verde para produção
       .setDescription(
+        (isSandbox 
+          ? `⚠️ **AMBIENTE DE TESTES (SANDBOX)**\n` +
+            `Este QR Code é apenas para testes e **NÃO pode ser pago** com dinheiro real.\n` +
+            `Para pagamentos reais, configure o ambiente de PRODUÇÃO.\n\n`
+          : ''
+        ) +
         `**Valor:** R$ ${valor.toFixed(2)}\n` +
         `**ID da Transação:** \`${result.transactionId}\`\n` +
         `**Status:** ⏳ Aguardando pagamento\n\n` +
