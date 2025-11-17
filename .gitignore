@@ -24,6 +24,10 @@ Thumbs.db
 # Storage files
 *.db
 orders.json
+user_balances.json
+pix_transactions.json
+published_accounts.json
+purchase_logs.json
 
 # Certificates and sensitive files
 *.p12

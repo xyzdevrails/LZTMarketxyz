@@ -8,6 +8,7 @@ import { logger } from './utils/logger';
 import * as contasCommand from './commands/contas';
 import * as contaCommand from './commands/conta';
 import * as adminCommand from './commands/admin';
+import * as adicionarsaldoCommand from './commands/adicionarsaldo';
 
 // Tipo para comandos
 interface Command {
@@ -37,6 +38,40 @@ const lztService = new LZTService(
 
 const purchaseService = new PurchaseService(lztService);
 
+// Inicializa serviços EfiBank (opcional - só se configurado)
+let efiService: any = null;
+let balanceService: any = null;
+
+// Função para inicializar serviços EfiBank
+async function initializeEfiServices() {
+  try {
+    if (process.env.EFI_CLIENT_ID && process.env.EFI_CLIENT_SECRET) {
+      const { EfiService } = await import('./services/efiService');
+      const { BalanceService } = await import('./services/balanceService');
+      
+      try {
+        efiService = new EfiService();
+        balanceService = new BalanceService(efiService);
+        logger.info('Serviços EfiBank inicializados com sucesso');
+        return true;
+      } catch (efiError: any) {
+        // Erro específico do EfiService (ex: certificado não encontrado)
+        logger.warn('Erro ao inicializar EfiService:', efiError.message);
+        logger.warn('Comando /adicionarsaldo não estará totalmente funcional até configurar o certificado');
+        // Ainda permite registrar o comando, mas ele mostrará erro ao usar
+        return false;
+      }
+    } else {
+      logger.warn('Serviços EfiBank não inicializados (credenciais não configuradas)');
+      return false;
+    }
+  } catch (error: any) {
+    logger.warn('Erro ao inicializar serviços EfiBank:', error.message);
+    logger.warn('Comando /adicionarsaldo não estará disponível');
+    return false;
+  }
+}
+
 // Cria cliente Discord
 const client = new Client({
   intents: [
@@ -55,10 +90,24 @@ commands.set(contasCommand.data.name, contasCommand as Command);
 commands.set(contaCommand.data.name, contaCommand as Command);
 commands.set(adminCommand.data.name, adminCommand as Command);
 
+// Registra comando de adicionar saldo (será registrado após inicialização dos serviços)
+
 // Evento: Bot pronto
 client.once(Events.ClientReady, async (readyClient) => {
   logger.info(`Bot conectado como ${readyClient.user.tag}!`);
   logger.info(`Bot ID: ${readyClient.user.id}`);
+  
+  // Inicializa serviços EfiBank se disponíveis
+  const efiInitialized = await initializeEfiServices();
+  
+  // Registra comando de adicionar saldo se credenciais estiverem configuradas
+  // (mesmo que o certificado não esteja, para mostrar mensagem de erro útil)
+  if (process.env.EFI_CLIENT_ID && process.env.EFI_CLIENT_SECRET) {
+    commands.set(adicionarsaldoCommand.data.name, adicionarsaldoCommand as Command);
+    if (!efiInitialized || !balanceService) {
+      logger.warn('Comando /adicionarsaldo registrado, mas não funcionará até configurar o certificado .p12');
+    }
+  }
   
   // Registra comandos slash
   try {
@@ -132,6 +181,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await command.execute(interaction, lztService);
       } else if (interaction.commandName === 'admin') {
         await command.execute(interaction, purchaseService);
+      } else if (interaction.commandName === 'adicionarsaldo') {
+        if (!balanceService) {
+          await interaction.reply({
+            content: '❌ **Serviço de saldo não está disponível**\n\n' +
+              'Configure as credenciais da EfiBank no Railway:\n' +
+              '- `EFI_CLIENT_ID`\n' +
+              '- `EFI_CLIENT_SECRET`\n' +
+              '- `EFI_CERTIFICATE_PATH` (caminho para o arquivo .p12)',
+            ephemeral: true,
+          });
+          return;
+        }
+        await command.execute(interaction, balanceService);
       } else {
         await command.execute(interaction);
       }
