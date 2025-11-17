@@ -25,3 +25,16 @@ Thumbs.db
 *.db
 orders.json
 
+# Certificates and sensitive files
+*.p12
+*.crt
+*.key
+certs/
+
+# Gradle (if exists)
+.gradle/
+gradle/
+
+# Test files (optional - remove if you want to commit them)
+src/test-*.ts
+

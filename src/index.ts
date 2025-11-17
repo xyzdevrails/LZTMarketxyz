@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Collection, Events } from 'discord.js';
+import { Client, GatewayIntentBits, Collection, Events, ChatInputCommandInteraction, SlashCommandBuilder } from 'discord.js';
 import dotenv from 'dotenv';
 import { LZTService } from './services/lztService';
 import { PurchaseService } from './services/purchaseService';
@@ -8,6 +8,12 @@ import { logger } from './utils/logger';
 import * as contasCommand from './commands/contas';
 import * as contaCommand from './commands/conta';
 import * as adminCommand from './commands/admin';
+
+// Tipo para comandos
+interface Command {
+  data: SlashCommandBuilder;
+  execute: (interaction: ChatInputCommandInteraction, ...args: any[]) => Promise<void>;
+}
 
 // Carrega variáveis de ambiente
 dotenv.config();
@@ -42,12 +48,12 @@ const client = new Client({
 });
 
 // Coleção de comandos
-const commands = new Collection();
+const commands = new Collection<string, Command>();
 
 // Registra comandos
-commands.set(contasCommand.data.name, contasCommand);
-commands.set(contaCommand.data.name, contaCommand);
-commands.set(adminCommand.data.name, adminCommand);
+commands.set(contasCommand.data.name, contasCommand as Command);
+commands.set(contaCommand.data.name, contaCommand as Command);
+commands.set(adminCommand.data.name, adminCommand as Command);
 
 // Evento: Bot pronto
 client.once(Events.ClientReady, async (readyClient) => {
@@ -56,8 +62,8 @@ client.once(Events.ClientReady, async (readyClient) => {
   
   // Registra comandos slash
   try {
-    const commandsData = Array.from(commands.values()).map(cmd => cmd.data);
-    logger.info(`Registrando ${commandsData.length} comandos:`, commandsData.map(c => c.name));
+    const commandsData = Array.from(commands.values()).map((cmd) => cmd.data);
+    logger.info(`Registrando ${commandsData.length} comandos:`, commandsData.map((c) => c.name));
     
     // Tenta registrar comandos globalmente primeiro
     await readyClient.application?.commands.set(commandsData);
