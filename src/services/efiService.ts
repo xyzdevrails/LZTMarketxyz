@@ -92,10 +92,12 @@ export class EfiService {
     }
 
     try {
+      logger.info(`Inicializando EfiPay com sandbox=${this.sandbox}, certificado=${finalCertPath}`);
       this.efipay = new EfiPay(options);
-      logger.info(`EfiService inicializado (sandbox: ${this.sandbox})`);
+      logger.info(`EfiService inicializado com sucesso (sandbox: ${this.sandbox})`);
     } catch (error: any) {
       logger.error('Erro ao inicializar EfiPay:', error);
+      logger.error('Opções usadas:', JSON.stringify({ ...options, certificate: '[REDACTED]' }, null, 2));
       throw new Error(`Erro ao inicializar EfiPay: ${error.message || 'Erro desconhecido'}`);
     }
   }
@@ -158,7 +160,19 @@ export class EfiService {
       };
     } catch (error: any) {
       logger.error('Erro ao criar cobrança PIX', error);
-      throw new Error(`Erro ao criar cobrança PIX: ${error.message || error}`);
+      logger.error('Detalhes do erro:', JSON.stringify(error, null, 2));
+      
+      // Mensagem de erro mais específica
+      let errorMessage = error.message || 'Erro desconhecido';
+      
+      if (errorMessage.includes('sandbox') || errorMessage.includes('certificate')) {
+        errorMessage += '\n\n💡 Dica: Verifique se o certificado corresponde ao ambiente configurado:\n';
+        errorMessage += `- Certificado de PRODUÇÃO deve ter EFI_SANDBOX=false\n`;
+        errorMessage += `- Certificado de SANDBOX deve ter EFI_SANDBOX=true\n`;
+        errorMessage += `- Configuração atual: EFI_SANDBOX=${this.sandbox}`;
+      }
+      
+      throw new Error(`Erro ao criar cobrança PIX: ${errorMessage}`);
     }
   }
 
