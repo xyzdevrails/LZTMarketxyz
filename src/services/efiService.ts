@@ -26,25 +26,46 @@ export class EfiService {
     let tempCertPath: string | null = null;
     if (certificateBase64) {
       try {
-        // Remove espaços e quebras de linha do base64
-        const cleanBase64 = certificateBase64.replace(/\s/g, '');
+        // Remove TODOS os espaços, quebras de linha, tabs, etc do base64
+        const cleanBase64 = certificateBase64
+          .replace(/\s/g, '') // Remove todos os espaços em branco
+          .replace(/\n/g, '')  // Remove quebras de linha
+          .replace(/\r/g, '')  // Remove carriage return
+          .replace(/\t/g, '')  // Remove tabs
+          .trim();              // Remove espaços no início/fim
+        
+        logger.info(`Processando certificado base64 (tamanho original: ${certificateBase64.length}, limpo: ${cleanBase64.length})`);
+        
+        if (cleanBase64.length === 0) {
+          throw new Error('Certificado base64 está vazio após limpeza');
+        }
+        
         const certBuffer = Buffer.from(cleanBase64, 'base64');
         
         // Valida se o buffer tem conteúdo válido
         if (certBuffer.length === 0) {
-          throw new Error('Certificado base64 está vazio ou inválido');
+          throw new Error('Falha ao decodificar certificado base64 - buffer vazio');
+        }
+        
+        // Valida tamanho mínimo de um certificado .p12 (geralmente > 1000 bytes)
+        if (certBuffer.length < 500) {
+          logger.warn(`Certificado parece muito pequeno: ${certBuffer.length} bytes`);
         }
         
         tempCertPath = path.join(process.cwd(), 'temp_certificado.p12');
         fs.writeFileSync(tempCertPath, certBuffer);
-        logger.info(`Certificado carregado de variável de ambiente (base64) - ${certBuffer.length} bytes`);
+        logger.info(`Certificado carregado de variável de ambiente (base64) - ${certBuffer.length} bytes salvos em ${tempCertPath}`);
         
         // Verifica se o arquivo foi criado corretamente
         if (!fs.existsSync(tempCertPath)) {
           throw new Error('Falha ao criar arquivo temporário do certificado');
         }
+        
+        const fileStats = fs.statSync(tempCertPath);
+        logger.info(`Arquivo certificado criado: ${fileStats.size} bytes`);
       } catch (error: any) {
         logger.error('Erro ao processar certificado base64:', error);
+        logger.error('Stack:', error.stack);
         throw new Error(`Erro ao processar certificado base64: ${error.message}`);
       }
     } else {
