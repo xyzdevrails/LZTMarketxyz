@@ -164,8 +164,32 @@ export class EfiService {
       
       // Mensagem de erro mais específica
       let errorMessage = error.message || 'Erro desconhecido';
+      let errorObj: any = {};
       
-      if (errorMessage.includes('sandbox') || errorMessage.includes('certificate')) {
+      // Tenta extrair informações do erro
+      try {
+        if (typeof error === 'string') {
+          errorObj = JSON.parse(error);
+        } else if (error.error) {
+          errorObj = error;
+        }
+      } catch (e) {
+        // Ignora se não conseguir parsear
+      }
+      
+      // Trata erros específicos
+      if (errorObj.error === 'invalid_client' || errorMessage.includes('Invalid or inactive credentials')) {
+        errorMessage = 'Credenciais inválidas ou inativas\n\n';
+        errorMessage += '💡 Possíveis causas:\n';
+        errorMessage += `1. CLIENT_ID ou CLIENT_SECRET incorretos\n`;
+        errorMessage += `2. Credenciais de SANDBOX sendo usadas em PRODUÇÃO (ou vice-versa)\n`;
+        errorMessage += `3. Credenciais inativas ou expiradas\n\n`;
+        errorMessage += `📋 Verifique:\n`;
+        errorMessage += `- EFI_CLIENT_ID está correto?\n`;
+        errorMessage += `- EFI_CLIENT_SECRET está correto?\n`;
+        errorMessage += `- EFI_SANDBOX=${this.sandbox} corresponde às credenciais?\n`;
+        errorMessage += `- As credenciais são do ambiente ${this.sandbox ? 'SANDBOX' : 'PRODUÇÃO'}?`;
+      } else if (errorMessage.includes('sandbox') || errorMessage.includes('certificate')) {
         errorMessage += '\n\n💡 Dica: Verifique se o certificado corresponde ao ambiente configurado:\n';
         errorMessage += `- Certificado de PRODUÇÃO deve ter EFI_SANDBOX=false\n`;
         errorMessage += `- Certificado de SANDBOX deve ter EFI_SANDBOX=true\n`;
