@@ -26,11 +26,25 @@ export class EfiService {
     let tempCertPath: string | null = null;
     if (certificateBase64) {
       try {
-        const certBuffer = Buffer.from(certificateBase64, 'base64');
+        // Remove espaços e quebras de linha do base64
+        const cleanBase64 = certificateBase64.replace(/\s/g, '');
+        const certBuffer = Buffer.from(cleanBase64, 'base64');
+        
+        // Valida se o buffer tem conteúdo válido
+        if (certBuffer.length === 0) {
+          throw new Error('Certificado base64 está vazio ou inválido');
+        }
+        
         tempCertPath = path.join(process.cwd(), 'temp_certificado.p12');
         fs.writeFileSync(tempCertPath, certBuffer);
-        logger.info('Certificado carregado de variável de ambiente (base64)');
+        logger.info(`Certificado carregado de variável de ambiente (base64) - ${certBuffer.length} bytes`);
+        
+        // Verifica se o arquivo foi criado corretamente
+        if (!fs.existsSync(tempCertPath)) {
+          throw new Error('Falha ao criar arquivo temporário do certificado');
+        }
       } catch (error: any) {
+        logger.error('Erro ao processar certificado base64:', error);
         throw new Error(`Erro ao processar certificado base64: ${error.message}`);
       }
     } else {
@@ -42,12 +56,13 @@ export class EfiService {
       }
     }
 
+    const finalCertPath = tempCertPath || certificatePath;
+    
     const options: any = {
       sandbox: this.sandbox,
       client_id: clientId,
       client_secret: clientSecret,
-      certificate: tempCertPath || certificatePath,
-      cert_base64: !!certificateBase64, // Indica que o certificado está em base64
+      certificate: finalCertPath,
     };
 
     // Adiciona senha do certificado se configurada
