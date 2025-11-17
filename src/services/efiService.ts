@@ -15,24 +15,39 @@ export class EfiService {
     const clientId = process.env.EFI_CLIENT_ID;
     const clientSecret = process.env.EFI_CLIENT_SECRET;
     const certificatePath = process.env.EFI_CERTIFICATE_PATH || './certs/certificado.p12';
+    const certificateBase64 = process.env.EFI_CERTIFICATE_BASE64;
     this.sandbox = process.env.EFI_SANDBOX === 'true';
 
     if (!clientId || !clientSecret) {
       throw new Error('EFI_CLIENT_ID e EFI_CLIENT_SECRET são obrigatórios');
     }
 
-    // Verifica se o certificado existe
-    if (!fs.existsSync(certificatePath)) {
-      const errorMsg = `Certificado não encontrado em: ${certificatePath}. É necessário o arquivo .p12 da EfiBank.`;
-      logger.error(errorMsg);
-      throw new Error(errorMsg);
+    // Se certificado em base64 está configurado, salva temporariamente
+    let tempCertPath: string | null = null;
+    if (certificateBase64) {
+      try {
+        const certBuffer = Buffer.from(certificateBase64, 'base64');
+        tempCertPath = path.join(process.cwd(), 'temp_certificado.p12');
+        fs.writeFileSync(tempCertPath, certBuffer);
+        logger.info('Certificado carregado de variável de ambiente (base64)');
+      } catch (error: any) {
+        throw new Error(`Erro ao processar certificado base64: ${error.message}`);
+      }
+    } else {
+      // Verifica se o certificado existe no caminho especificado
+      if (!fs.existsSync(certificatePath)) {
+        const errorMsg = `Certificado não encontrado em: ${certificatePath}. É necessário o arquivo .p12 da EfiBank ou configurar EFI_CERTIFICATE_BASE64.`;
+        logger.error(errorMsg);
+        throw new Error(errorMsg);
+      }
     }
 
     const options: any = {
       sandbox: this.sandbox,
       client_id: clientId,
       client_secret: clientSecret,
-      certificate: certificatePath,
+      certificate: tempCertPath || certificatePath,
+      cert_base64: !!certificateBase64, // Indica que o certificado está em base64
     };
 
     // Adiciona senha do certificado se configurada
