@@ -29,10 +29,37 @@ export async function execute(
     const valor = interaction.options.getNumber('valor', true);
     const userId = interaction.user.id;
 
+    // Valida formato do valor (sem zeros à esquerda)
+    const valorString = valor.toString();
+    
+    // Verifica se tem zeros à esquerda (ex: 0001, 000001)
+    if (valorString.match(/^0+[1-9]/) || valorString.match(/^0+0/)) {
+      await interaction.editReply({
+        content: '❌ **Formato inválido!**\n\n' +
+          `Você digitou: \`${valorString}\`\n\n` +
+          '✅ **Use o formato correto:**\n' +
+          '• `1` ou `1.00` para R$ 1,00\n' +
+          '• `10` ou `10.00` para R$ 10,00\n' +
+          '• `100` ou `100.00` para R$ 100,00\n\n' +
+          '⚠️ **Não use zeros à esquerda** (ex: 0001, 000001)',
+      });
+      return;
+    }
+
     // Valida valor mínimo
     if (valor < 1) {
       await interaction.editReply({
         content: '❌ Valor mínimo é R$ 1,00',
+      });
+      return;
+    }
+    
+    // Valida se o valor é um número válido e positivo
+    if (isNaN(valor) || valor <= 0) {
+      await interaction.editReply({
+        content: '❌ **Valor inválido!**\n\n' +
+          'Por favor, informe um valor válido maior que zero.\n' +
+          'Exemplo: `1`, `10`, `50`, `100`',
       });
       return;
     }
