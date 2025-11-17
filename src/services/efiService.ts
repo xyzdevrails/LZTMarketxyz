@@ -175,19 +175,25 @@ export class EfiService {
 
       if (params.txid) {
         // Usa PUT para criar com txid próprio
-        logger.info(`Criando cobrança PIX com txid: ${params.txid}`);
+        logger.info(`[EFI] Criando cobrança PIX com txid: ${params.txid}`);
         response = await this.efipay.pixCreateImmediateCharge({ txid: params.txid }, chargeData);
       } else {
         // Usa POST para criar sem txid (EfiBank gera)
-        logger.info(`Criando cobrança PIX (EfiBank gerará txid)`);
+        logger.info(`[EFI] Criando cobrança PIX (EfiBank gerará txid)`);
         response = await this.efipay.pixCreateImmediateCharge({}, chargeData);
       }
 
-      logger.info(`Cobrança PIX criada: txid=${response.txid}, location=${response.loc.id}`);
+      const locationId = response.loc?.id;
+      if (!locationId) {
+        logger.error('[EFI] Resposta da API não contém location ID:', JSON.stringify(response, null, 2));
+        throw new Error('Location ID não retornado pela API da EfiBank. Não é possível gerar QR Code.');
+      }
+      
+      logger.info(`[EFI] Cobrança PIX criada: txid=${response.txid}, location=${locationId}`);
       
       return {
         txid: response.txid,
-        location: response.loc.id,
+        location: locationId,
         status: response.status,
         valor: response.valor,
         chave: response.chave,
