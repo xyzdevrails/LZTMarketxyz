@@ -28,12 +28,17 @@ export class EfiService {
       throw new Error(errorMsg);
     }
 
-    const options = {
+    const options: any = {
       sandbox: this.sandbox,
       client_id: clientId,
       client_secret: clientSecret,
       certificate: certificatePath,
     };
+
+    // Adiciona senha do certificado se configurada
+    if (process.env.EFI_CERTIFICATE_PASSWORD) {
+      options.certificate_password = process.env.EFI_CERTIFICATE_PASSWORD;
+    }
 
     try {
       this.efipay = new EfiPay(options);
