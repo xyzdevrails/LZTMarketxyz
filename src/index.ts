@@ -115,19 +115,32 @@ client.once(Events.ClientReady, async (readyClient) => {
   // Inicializa serviços EfiBank se disponíveis
   const efiInitialized = await initializeEfiServices();
   
-  // Inicializa webhook com serviços agora que estão disponíveis
-  if (WEBHOOK_ENABLED && balanceService) {
+  // Inicializa webhook (com ou sem serviços - para testes)
+  if (WEBHOOK_ENABLED) {
     try {
-      // Reinicia webhook com serviços corretos
+      // Reinicia webhook com serviços se disponíveis
       if (webhookServer) {
         await webhookServer.stop();
       }
-      webhookServer = new WebhookServer(WEBHOOK_PORT, balanceService, readyClient);
-      await webhookServer.start();
-      logger.info(`[WEBHOOK] Servidor webhook reiniciado com serviços na porta ${WEBHOOK_PORT}`);
+      
+      if (balanceService) {
+        // Inicia com serviços completos (pode processar pagamentos)
+        webhookServer = new WebhookServer(WEBHOOK_PORT, balanceService, readyClient);
+        await webhookServer.start();
+        logger.info(`[WEBHOOK] Servidor webhook iniciado com serviços na porta ${WEBHOOK_PORT}`);
+      } else {
+        // Inicia sem serviços (apenas para receber e logar - útil para testes)
+        webhookServer = new WebhookServer(WEBHOOK_PORT);
+        await webhookServer.start();
+        logger.info(`[WEBHOOK] Servidor webhook iniciado SEM serviços na porta ${WEBHOOK_PORT} (apenas recebe e loga)`);
+        logger.warn(`[WEBHOOK] Webhook não processará pagamentos até configurar certificado EfiBank`);
+      }
     } catch (error: any) {
-      logger.error('[WEBHOOK] Erro ao reiniciar webhook com serviços:', error);
+      logger.error('[WEBHOOK] Erro ao iniciar webhook:', error);
+      logger.warn('[WEBHOOK] Bot continuará sem webhook (confirmação manual necessária)');
     }
+  } else {
+    logger.info('[WEBHOOK] Servidor webhook desabilitado (WEBHOOK_ENABLED=false ou não configurado)');
   }
   
   // Registra comandos de saldo se credenciais estiverem configuradas
