@@ -348,11 +348,43 @@ export async function execute(
       return;
     }
 
-    const transactionId = interaction.options.getString('transaction_id', true);
+    const transactionIdInput = interaction.options.getString('transaction_id', true);
     await interaction.deferReply({ ephemeral: true });
 
     try {
-      const result = await balanceService.confirmPixPayment(transactionId);
+      // Tenta buscar primeiro por transaction_id, depois por efi_txid
+      logger.info(`[ADMIN] Tentando liberar saldo para transação: ${transactionIdInput}`);
+      
+      // Primeira tentativa: usar como transaction_id
+      let result = await balanceService.confirmPixPayment(transactionIdInput);
+      
+      // Se não encontrou, tenta usar como efi_txid
+      if (!result.success && result.error?.includes('não encontrada')) {
+        logger.info(`[ADMIN] Transação não encontrada por transaction_id, tentando como efi_txid...`);
+        result = await balanceService.confirmPixPayment('', transactionIdInput);
+      }
+      
+      // Se ainda não encontrou, lista todas as transações pendentes para debug
+      if (!result.success && result.error?.includes('não encontrada')) {
+        const allTransactions = pixTransactionsStorage.getAllTransactions();
+        const pendingTransactions = allTransactions.filter(t => t.status === 'pending');
+        
+        logger.warn(`[ADMIN] Transação ${transactionIdInput} não encontrada. Transações pendentes disponíveis:`);
+        pendingTransactions.forEach(t => {
+          logger.warn(`[ADMIN]   - transaction_id: ${t.transaction_id}, efi_txid: ${t.efi_txid || 'N/A'}`);
+        });
+        
+        await interaction.editReply({
+          content: `❌ **Transação não encontrada:**\n\n` +
+            `**ID informado:** \`${transactionIdInput}\`\n\n` +
+            `**Transações pendentes disponíveis:**\n` +
+            (pendingTransactions.length > 0 
+              ? pendingTransactions.map(t => `- \`${t.transaction_id}\` (efi_txid: ${t.efi_txid || 'N/A'})`).join('\n')
+              : 'Nenhuma transação pendente encontrada') +
+            `\n\n💡 Use o comando \`/admin historico-pix status:Pendentes\` para ver todas as transações pendentes.`,
+        });
+        return;
+      }
 
       if (!result.success) {
         await interaction.editReply({
@@ -365,7 +397,7 @@ export async function execute(
 
       await interaction.editReply({
         content: `✅ **Pagamento PIX confirmado com sucesso!**\n\n` +
-          `**ID da Transação:** \`${transactionId}\`\n` +
+          `**ID da Transação:** \`${transactionIdInput}\`\n` +
           `**Usuário:** <@${result.userId}>\n` +
           `**Valor:** R$ ${result.amount!.toFixed(2)}\n` +
           `**Novo Saldo:** R$ ${balanceService.getUserBalance(result.userId!).toFixed(2)}\n\n` +
@@ -375,7 +407,7 @@ export async function execute(
       try {
         await user.send(
           `✅ **Pagamento PIX Confirmado!**\n\n` +
-          `**ID da Transação:** \`${transactionId}\`\n` +
+          `**ID da Transação:** \`${transactionIdInput}\`\n` +
           `**Valor:** R$ ${result.amount!.toFixed(2)}\n` +
           `**Seu Saldo Atual:** R$ ${balanceService.getUserBalance(result.userId!).toFixed(2)}\n\n` +
           `Obrigado pela confiança! 💚`
