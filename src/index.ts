@@ -117,7 +117,7 @@ client.once(Events.ClientReady, async (readyClient) => {
           try {
             const webhookUrl = process.env.WEBHOOK_URL || 
               (process.env.RAILWAY_PUBLIC_DOMAIN 
-                ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/webhook`
+                ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/webhook/pix`
                 : null);
             
             if (webhookUrl) {
