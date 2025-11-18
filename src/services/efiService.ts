@@ -437,7 +437,7 @@ export class EfiService {
         if (status === 400) {
           errorMessage = `URL inválida ou configuração incorreta: ${JSON.stringify(data)}`;
         } else if (status === 403) {
-          errorMessage = 'Acesso negado. Verifique se tem a permissão "webhook.write" habilitada.';
+          errorMessage = 'Acesso negado. Verifique se tem a permissão "Alterar Webhooks" habilitada no painel da EfiBank.';
         } else if (status === 404) {
           errorMessage = 'Chave PIX não encontrada. Verifique se EFI_PIX_KEY está correto.';
         } else {

@@ -87,13 +87,16 @@ Vou criar uma função que:
 
 ### Permissões Necessárias na EfiBank:
 
-Você precisa ter a permissão `webhook.write` nas suas credenciais.
+Você precisa ter a permissão **"Alterar Webhooks"** habilitada nas suas credenciais.
 
 **Como verificar:**
-1. Acesse o painel da EfiBank
+1. Acesse o painel da EfiBank (https://app.efipay.com.br)
 2. Vá em "Aplicações" ou "API"
-3. Verifique se `webhook.write` está habilitado
-4. Se não estiver, habilite ou peça para habilitarem
+3. Encontre suas credenciais (CLIENT_ID)
+4. Verifique se **"Alterar Webhooks"** está habilitado
+5. Se não estiver, habilite ou peça para habilitarem
+
+**📋 Veja o guia completo:** `PERMISSOES_WEBHOOK_EFIBANK.md`
 
 ### Variáveis de Ambiente:
 
