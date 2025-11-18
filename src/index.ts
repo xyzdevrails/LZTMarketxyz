@@ -10,6 +10,7 @@ import * as contaCommand from './commands/conta';
 import * as adminCommand from './commands/admin';
 import * as adicionarsaldoCommand from './commands/adicionarsaldo';
 import * as meusaldoCommand from './commands/meusaldo';
+import { WebhookServer } from './server/webhookServer';
 
 // Tipo para comandos
 interface Command {
@@ -93,6 +94,32 @@ commands.set(adminCommand.data.name, adminCommand as Command);
 commands.set(meusaldoCommand.data.name, meusaldoCommand as Command);
 
 // Registra comando de adicionar saldo (será registrado após inicialização dos serviços)
+
+// Inicializa servidor webhook (se configurado)
+let webhookServer: any = null;
+const WEBHOOK_PORT = parseInt(process.env.WEBHOOK_PORT || '3000', 10);
+const WEBHOOK_ENABLED = process.env.WEBHOOK_ENABLED === 'true';
+
+// Função para inicializar webhook
+async function initializeWebhookServer() {
+  if (WEBHOOK_ENABLED) {
+    try {
+      webhookServer = new WebhookServer(WEBHOOK_PORT);
+      await webhookServer.start();
+      logger.info(`[WEBHOOK] Servidor webhook habilitado na porta ${WEBHOOK_PORT}`);
+    } catch (error: any) {
+      logger.error('[WEBHOOK] Erro ao iniciar servidor webhook:', error);
+      logger.warn('[WEBHOOK] Bot continuará sem webhook (confirmação manual necessária)');
+    }
+  } else {
+    logger.info('[WEBHOOK] Servidor webhook desabilitado (WEBHOOK_ENABLED=false ou não configurado)');
+  }
+}
+
+// Inicializa webhook em paralelo
+initializeWebhookServer().catch((error) => {
+  logger.error('[WEBHOOK] Erro fatal ao inicializar webhook:', error);
+});
 
 // Evento: Bot pronto
 client.once(Events.ClientReady, async (readyClient) => {
@@ -275,6 +302,25 @@ process.on('unhandledRejection', (error) => {
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception', error);
   process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  logger.info('Recebido SIGINT, encerrando...');
+  if (webhookServer) {
+    await webhookServer.stop();
+  }
+  client.destroy();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  logger.info('Recebido SIGTERM, encerrando...');
+  if (webhookServer) {
+    await webhookServer.stop();
+  }
+  client.destroy();
+  process.exit(0);
 });
 
 // Conecta o bot
