@@ -2,6 +2,8 @@ import EfiPay from 'sdk-node-apis-efi';
 import { logger } from '../utils/logger';
 import fs from 'fs';
 import path from 'path';
+import axios from 'axios';
+import https from 'https';
 
 export class EfiService {
   private efipay: EfiPay;
@@ -301,6 +303,254 @@ export class EfiService {
     } catch (error: any) {
       logger.error('Erro ao consultar cobrança', error);
       throw new Error(`Erro ao consultar cobrança: ${error.message || error}`);
+    }
+  }
+
+  /**
+   * Registra webhook para notificações PIX automáticas
+   * @param webhookUrl URL pública do webhook (ex: https://seu-dominio.com/webhook)
+   * @param pixKey Chave PIX para associar o webhook
+   * @param skipMtls Se true, usa skip-mTLS (recomendado para Railway)
+   * @returns Informações do webhook registrado
+   */
+  async registerWebhook(webhookUrl: string, pixKey?: string, skipMtls: boolean = true): Promise<any> {
+    try {
+      const chave = pixKey || process.env.EFI_PIX_KEY;
+      
+      if (!chave) {
+        throw new Error('Chave PIX não configurada. Configure EFI_PIX_KEY.');
+      }
+
+      // Adiciona ?ignorar= para evitar que a EfiBank adicione /pix no final
+      // Isso permite usar a mesma URL para registro e recebimento
+      const webhookUrlWithParam = webhookUrl.includes('?') 
+        ? `${webhookUrl}&ignorar=`
+        : `${webhookUrl}?ignorar=`;
+
+      logger.info(`[EFI] Registrando webhook PIX:`);
+      logger.info(`[EFI]   - URL: ${webhookUrlWithParam}`);
+      logger.info(`[EFI]   - Chave PIX: ${chave.substring(0, 10)}...${chave.substring(chave.length - 4)}`);
+      logger.info(`[EFI]   - Skip-mTLS: ${skipMtls}`);
+
+      const baseUrl = this.sandbox 
+        ? 'https://pix-h.api.efipay.com.br'
+        : 'https://pix.api.efipay.com.br';
+      
+      const url = `${baseUrl}/v2/webhook/${chave}`;
+      
+      // Prepara headers
+      const headers: any = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (skipMtls) {
+        headers['x-skip-mtls-checking'] = 'true';
+      }
+
+      // Usa o método PUT do SDK através do método genérico
+      // O SDK tem um método genérico que podemos usar
+      const requestData = {
+        webhookUrl: webhookUrlWithParam
+      };
+
+      // Obtém token de acesso OAuth primeiro
+      const tokenUrl = this.sandbox
+        ? 'https://pix-h.api.efipay.com.br/oauth/token'
+        : 'https://pix.api.efipay.com.br/oauth/token';
+      
+      const clientId = process.env.EFI_CLIENT_ID;
+      const clientSecret = process.env.EFI_CLIENT_SECRET;
+      const certPath = process.env.EFI_CERTIFICATE_PATH || './certs/certificado.p12';
+      const certPassword = process.env.EFI_CERTIFICATE_PASSWORD;
+      
+      // Carrega certificado
+      let finalCertPath = certPath;
+      if (process.env.EFI_CERTIFICATE_BASE64) {
+        // Se tiver base64, usa o temp
+        finalCertPath = path.join(process.cwd(), 'temp_certificado.p12');
+        if (!fs.existsSync(finalCertPath)) {
+          throw new Error('Certificado temporário não encontrado. Reinicie o bot.');
+        }
+      }
+      
+      if (!fs.existsSync(finalCertPath)) {
+        throw new Error(`Certificado não encontrado em: ${finalCertPath}`);
+      }
+
+      // Configura agente HTTPS com certificado
+      const certBuffer = fs.readFileSync(finalCertPath);
+      const httpsAgent = new https.Agent({
+        pfx: certBuffer,
+        passphrase: certPassword || '',
+        rejectUnauthorized: true
+      });
+
+      // Obtém token OAuth
+      logger.info('[EFI] Obtendo token OAuth...');
+      const tokenResponse = await axios.post(
+        tokenUrl,
+        'grant_type=client_credentials',
+        {
+          httpsAgent,
+          auth: {
+            username: clientId!,
+            password: clientSecret!
+          },
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      );
+
+      const accessToken = tokenResponse.data.access_token;
+      if (!accessToken) {
+        throw new Error('Não foi possível obter token de acesso');
+      }
+
+      logger.info('[EFI] Token OAuth obtido com sucesso');
+
+      // Faz chamada PUT para registrar webhook
+      logger.info(`[EFI] Fazendo PUT para: ${url}`);
+      const response = await axios.put(
+        url,
+        requestData,
+        {
+          httpsAgent,
+          headers: {
+            ...headers,
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      logger.info(`[EFI] ✅ Webhook registrado com sucesso!`);
+      logger.info(`[EFI] Resposta: ${JSON.stringify(response.data || response, null, 2)}`);
+      
+      return response.data || response;
+    } catch (error: any) {
+      let errorMessage = 'Erro desconhecido';
+      
+      if (error.response) {
+        const status = error.response.status;
+        const data = error.response.data;
+        
+        if (status === 400) {
+          errorMessage = `URL inválida ou configuração incorreta: ${JSON.stringify(data)}`;
+        } else if (status === 403) {
+          errorMessage = 'Acesso negado. Verifique se tem a permissão "webhook.write" habilitada.';
+        } else if (status === 404) {
+          errorMessage = 'Chave PIX não encontrada. Verifique se EFI_PIX_KEY está correto.';
+        } else {
+          errorMessage = `Erro HTTP ${status}: ${JSON.stringify(data)}`;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = JSON.stringify(error);
+      }
+      
+      logger.error(`[EFI] ❌ Erro ao registrar webhook: ${errorMessage}`);
+      throw new Error(`Erro ao registrar webhook: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Consulta webhook registrado para uma chave PIX
+   * @param pixKey Chave PIX (opcional, usa EFI_PIX_KEY se não informado)
+   * @returns Informações do webhook ou null se não estiver registrado
+   */
+  async getWebhook(pixKey?: string): Promise<any | null> {
+    try {
+      const chave = pixKey || process.env.EFI_PIX_KEY;
+      
+      if (!chave) {
+        throw new Error('Chave PIX não configurada. Configure EFI_PIX_KEY.');
+      }
+
+      logger.info(`[EFI] Consultando webhook para chave: ${chave.substring(0, 10)}...${chave.substring(chave.length - 4)}`);
+
+      // Faz chamada GET para consultar webhook
+      const baseUrl = this.sandbox 
+        ? 'https://pix-h.api.efipay.com.br'
+        : 'https://pix.api.efipay.com.br';
+      
+      const url = `${baseUrl}/v2/webhook/${chave}`;
+      
+      // Obtém token OAuth (reutiliza lógica do registerWebhook)
+      const tokenUrl = this.sandbox
+        ? 'https://pix-h.api.efipay.com.br/oauth/token'
+        : 'https://pix.api.efipay.com.br/oauth/token';
+      
+      const clientId = process.env.EFI_CLIENT_ID;
+      const clientSecret = process.env.EFI_CLIENT_SECRET;
+      const certPath = process.env.EFI_CERTIFICATE_PATH || './certs/certificado.p12';
+      const certPassword = process.env.EFI_CERTIFICATE_PASSWORD;
+      
+      let finalCertPath = certPath;
+      if (process.env.EFI_CERTIFICATE_BASE64) {
+        finalCertPath = path.join(process.cwd(), 'temp_certificado.p12');
+        if (!fs.existsSync(finalCertPath)) {
+          logger.warn('[EFI] Certificado temporário não encontrado para consultar webhook');
+          return null;
+        }
+      }
+      
+      if (!fs.existsSync(finalCertPath)) {
+        logger.warn(`[EFI] Certificado não encontrado em: ${finalCertPath}`);
+        return null;
+      }
+
+      const certBuffer = fs.readFileSync(finalCertPath);
+      const httpsAgent = new https.Agent({
+        pfx: certBuffer,
+        passphrase: certPassword || '',
+        rejectUnauthorized: true
+      });
+
+      try {
+        // Obtém token OAuth
+        const tokenResponse = await axios.post(
+          tokenUrl,
+          'grant_type=client_credentials',
+          {
+            httpsAgent,
+            auth: {
+              username: clientId!,
+              password: clientSecret!
+            },
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          }
+        );
+
+        const accessToken = tokenResponse.data.access_token;
+        if (!accessToken) {
+          logger.warn('[EFI] Não foi possível obter token para consultar webhook');
+          return null;
+        }
+
+        // Faz chamada GET
+        const response = await axios.get(url, {
+          httpsAgent,
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        });
+
+        logger.info(`[EFI] Webhook encontrado: ${JSON.stringify(response.data, null, 2)}`);
+        return response.data;
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          logger.info('[EFI] Webhook não está registrado ainda');
+          return null;
+        }
+        logger.error(`[EFI] Erro ao consultar webhook: ${error.message || error}`);
+        throw error;
+      }
+    } catch (error: any) {
+      logger.error(`[EFI] Erro ao consultar webhook: ${error.message || error}`);
+      throw error;
     }
   }
 }

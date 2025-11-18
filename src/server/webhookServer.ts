@@ -45,11 +45,27 @@ export class WebhookServer {
 
     this.app.post('/webhook/pix', async (req: Request, res: Response) => {
       try {
+        // Valida IP da EfiBank (quando usando skip-mTLS)
+        const clientIp = req.ip || req.socket.remoteAddress || '';
+        const efibankIp = '34.193.116.226';
+        
+        // Se não for do IP da EfiBank, rejeita (mas loga para debug)
+        if (!clientIp.includes(efibankIp) && process.env.WEBHOOK_VALIDATE_IP !== 'false') {
+          logger.warn(`[WEBHOOK] ⚠️ Requisição rejeitada - IP não autorizado: ${clientIp}`);
+          logger.warn(`[WEBHOOK] IP esperado da EfiBank: ${efibankIp}`);
+          logger.warn(`[WEBHOOK] Para desabilitar validação de IP, configure WEBHOOK_VALIDATE_IP=false`);
+          return res.status(403).json({ 
+            error: 'IP não autorizado',
+            received_ip: clientIp,
+            expected_ip: efibankIp
+          });
+        }
+        
         logger.info('[WEBHOOK] ========================================');
         logger.info('[WEBHOOK] Recebido webhook PIX');
         logger.info('[WEBHOOK] Headers:', JSON.stringify(req.headers, null, 2));
         logger.info('[WEBHOOK] Body:', JSON.stringify(req.body, null, 2));
-        logger.info('[WEBHOOK] IP:', req.ip);
+        logger.info('[WEBHOOK] IP:', clientIp);
         logger.info('[WEBHOOK] ========================================');
         
         if (this.webhookHandler) {

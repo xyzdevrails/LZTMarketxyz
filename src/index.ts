@@ -111,6 +111,46 @@ client.once(Events.ClientReady, async (readyClient) => {
         webhookServer = new WebhookServer(WEBHOOK_PORT, balanceService, readyClient);
         await webhookServer.start();
         logger.info(`[WEBHOOK] Servidor webhook iniciado com serviços na porta ${WEBHOOK_PORT}`);
+        
+        // Registra webhook automaticamente na EfiBank
+        if (efiService && process.env.EFI_PIX_KEY) {
+          try {
+            const webhookUrl = process.env.WEBHOOK_URL || 
+              (process.env.RAILWAY_PUBLIC_DOMAIN 
+                ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/webhook`
+                : null);
+            
+            if (webhookUrl) {
+              logger.info(`[WEBHOOK] Tentando registrar webhook automaticamente na EfiBank...`);
+              logger.info(`[WEBHOOK] URL: ${webhookUrl}`);
+              
+              // Verifica se já está registrado
+              const existingWebhook = await efiService.getWebhook();
+              // Remove ?ignorar= da comparação, pois pode estar presente na URL registrada
+              const normalizeUrl = (url: string) => url.replace(/\?ignorar=.*$/, '').replace(/\/$/, '');
+              const existingUrlNormalized = existingWebhook?.webhookUrl ? normalizeUrl(existingWebhook.webhookUrl) : null;
+              const newUrlNormalized = normalizeUrl(webhookUrl);
+              
+              if (existingWebhook && existingUrlNormalized === newUrlNormalized) {
+                logger.info(`[WEBHOOK] ✅ Webhook já está registrado: ${existingWebhook.webhookUrl}`);
+              } else {
+                // Registra novo webhook
+                await efiService.registerWebhook(webhookUrl, undefined, true); // skip-mTLS = true
+                logger.info(`[WEBHOOK] ✅ Webhook registrado automaticamente na EfiBank!`);
+              }
+            } else {
+              logger.warn(`[WEBHOOK] ⚠️ Não foi possível determinar URL do webhook. Configure WEBHOOK_URL ou RAILWAY_PUBLIC_DOMAIN.`);
+            }
+          } catch (webhookError: any) {
+            logger.error(`[WEBHOOK] ❌ Erro ao registrar webhook automaticamente: ${webhookError.message}`);
+            logger.warn(`[WEBHOOK] Você pode registrar manualmente via API ou painel da EfiBank`);
+            logger.warn(`[WEBHOOK] O webhook continuará funcionando, mas precisa ser registrado na EfiBank para receber notificações automáticas`);
+          }
+        } else {
+          logger.warn(`[WEBHOOK] ⚠️ Não foi possível registrar webhook automaticamente:`);
+          if (!efiService) logger.warn(`[WEBHOOK]   - EfiService não inicializado`);
+          if (!process.env.EFI_PIX_KEY) logger.warn(`[WEBHOOK]   - EFI_PIX_KEY não configurado`);
+        }
       } else {
         webhookServer = new WebhookServer(WEBHOOK_PORT);
         await webhookServer.start();
