@@ -43,30 +43,62 @@ export class WebhookServer {
       res.json({ status: 'ok', service: 'webhook-server' });
     });
 
+    // Endpoint para validação da EfiBank (GET) - não valida IP
+    this.app.get('/webhook/pix', async (req: Request, res: Response) => {
+      logger.info('[WEBHOOK] Requisição GET recebida (validação da EfiBank)');
+      logger.info('[WEBHOOK] IP:', req.ip || req.socket.remoteAddress);
+      res.status(200).json({ 
+        status: 'ok',
+        message: 'Webhook endpoint está ativo',
+        timestamp: new Date().toISOString()
+      });
+    });
+
     this.app.post('/webhook/pix', async (req: Request, res: Response) => {
       try {
-        // Valida IP da EfiBank (quando usando skip-mTLS)
         const clientIp = req.ip || req.socket.remoteAddress || '';
         const efibankIp = '34.193.116.226';
         
-        // Se não for do IP da EfiBank, rejeita (mas loga para debug)
-        if (!clientIp.includes(efibankIp) && process.env.WEBHOOK_VALIDATE_IP !== 'false') {
-          logger.warn(`[WEBHOOK] ⚠️ Requisição rejeitada - IP não autorizado: ${clientIp}`);
-          logger.warn(`[WEBHOOK] IP esperado da EfiBank: ${efibankIp}`);
-          logger.warn(`[WEBHOOK] Para desabilitar validação de IP, configure WEBHOOK_VALIDATE_IP=false`);
-          return res.status(403).json({ 
-            error: 'IP não autorizado',
-            received_ip: clientIp,
-            expected_ip: efibankIp
-          });
+        // Verifica se é uma requisição de validação (body vazio ou sem campo 'pix')
+        const isValidationRequest = !req.body || Object.keys(req.body).length === 0 || !req.body.pix;
+        
+        // Valida IP apenas para webhooks reais (não para validação)
+        // Durante o registro, a EfiBank faz uma requisição de validação que pode vir de IP diferente
+        if (!isValidationRequest && process.env.WEBHOOK_VALIDATE_IP !== 'false') {
+          // Verifica se o IP corresponde ao da EfiBank
+          const ipMatches = clientIp.includes(efibankIp) || 
+                           clientIp === efibankIp ||
+                           clientIp.replace('::ffff:', '') === efibankIp;
+          
+          if (!ipMatches) {
+            logger.warn(`[WEBHOOK] ⚠️ Requisição rejeitada - IP não autorizado: ${clientIp}`);
+            logger.warn(`[WEBHOOK] IP esperado da EfiBank: ${efibankIp}`);
+            logger.warn(`[WEBHOOK] Para desabilitar validação de IP, configure WEBHOOK_VALIDATE_IP=false`);
+            return res.status(403).json({ 
+              error: 'IP não autorizado',
+              received_ip: clientIp,
+              expected_ip: efibankIp
+            });
+          }
         }
         
         logger.info('[WEBHOOK] ========================================');
-        logger.info('[WEBHOOK] Recebido webhook PIX');
+        logger.info(`[WEBHOOK] Recebido webhook PIX (${isValidationRequest ? 'VALIDAÇÃO' : 'REAL'})`);
         logger.info('[WEBHOOK] Headers:', JSON.stringify(req.headers, null, 2));
         logger.info('[WEBHOOK] Body:', JSON.stringify(req.body, null, 2));
         logger.info('[WEBHOOK] IP:', clientIp);
         logger.info('[WEBHOOK] ========================================');
+        
+        // Se for apenas validação, retorna 200 sem processar
+        if (isValidationRequest) {
+          logger.info('[WEBHOOK] Requisição de validação - retornando 200');
+          return res.status(200).json({ 
+            received: true,
+            validated: true,
+            timestamp: new Date().toISOString(),
+            message: 'Webhook endpoint validado com sucesso'
+          });
+        }
         
         if (this.webhookHandler) {
           const result = await this.webhookHandler.processPixWebhook(req.body);
@@ -121,7 +153,8 @@ export class WebhookServer {
           logger.info(`[WEBHOOK] Servidor webhook iniciado na porta ${this.port}`);
           logger.info(`[WEBHOOK] Endpoints disponíveis:`);
           logger.info(`[WEBHOOK]   - GET  /health`);
-          logger.info(`[WEBHOOK]   - POST /webhook/pix`);
+          logger.info(`[WEBHOOK]   - GET  /webhook/pix (validação EfiBank)`);
+          logger.info(`[WEBHOOK]   - POST /webhook/pix (webhooks reais)`);
           logger.info(`[WEBHOOK]   - POST /webhook/test`);
           resolve();
         });
