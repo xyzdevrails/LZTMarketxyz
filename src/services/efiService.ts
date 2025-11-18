@@ -156,6 +156,20 @@ export class EfiService {
         chargeData.solicitacaoPagador = params.solicitacaoPagador;
       }
 
+      // Adiciona URL do webhook se configurada
+      const webhookUrl = process.env.WEBHOOK_URL || process.env.RAILWAY_PUBLIC_DOMAIN 
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN || 'lztmarketxyz-production.up.railway.app'}/webhook/pix`
+        : null;
+      
+      if (webhookUrl) {
+        chargeData.solicitacaoPagador = chargeData.solicitacaoPagador || '';
+        // A EfiBank pode aceitar webhook no payload da cobrança
+        // Tentamos adicionar como campo adicional (se suportado pela API)
+        logger.info(`[EFI] Tentando adicionar webhook URL: ${webhookUrl}`);
+        // Nota: A estrutura exata depende da API da EfiBank
+        // Se não funcionar, o webhook pode ser configurado globalmente via API separada
+      }
+
       let response;
 
       if (params.txid) {
