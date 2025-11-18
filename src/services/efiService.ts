@@ -455,7 +455,18 @@ export class EfiService {
         
         if (status === 400) {
           // Tenta extrair mensagem mais específica
-          if (data?.nome && data?.mensagem) {
+          if (data?.nome === 'webhook_nao_encontrado') {
+            // Erro específico: chave PIX pode não suportar webhook
+            errorMessage = `Chave PIX não suporta webhook ou não está configurada corretamente.\n\n`;
+            errorMessage += `💡 Possíveis causas:\n`;
+            errorMessage += `1. Chave PIX aleatória pode ter restrições (use CPF/CNPJ/E-mail se possível)\n`;
+            errorMessage += `2. Chave PIX não está ativa na conta EfiBank\n`;
+            errorMessage += `3. Chave PIX está em ambiente diferente (sandbox vs produção)\n\n`;
+            errorMessage += `📋 Verifique:\n`;
+            errorMessage += `- A chave PIX está cadastrada na sua conta EfiBank?\n`;
+            errorMessage += `- A chave está no ambiente correto (${this.sandbox ? 'SANDBOX' : 'PRODUÇÃO'})?\n`;
+            errorMessage += `- Tente usar uma chave CPF/CNPJ/E-mail em vez de aleatória`;
+          } else if (data?.nome && data?.mensagem) {
             errorMessage = `${data.nome}: ${data.mensagem}`;
           } else if (data?.erros && Array.isArray(data.erros)) {
             const erros = data.erros.map((e: any) => `${e.caminho || ''}: ${e.mensagem || ''}`).join(', ');
