@@ -15,6 +15,7 @@
     "test-user": "ts-node src/test-user-accounts.ts",
     "test-search": "ts-node src/test-market-search.ts",
     "test-list": "ts-node src/test-list-accounts.ts",
+    "test-webhook": "node scripts/test-webhook.js",
     "lint": "eslint src --ext .ts"
   },
   "keywords": [

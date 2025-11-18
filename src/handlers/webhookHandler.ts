@@ -69,7 +69,14 @@ export class WebhookHandler {
       }
 
       // Confirma pagamento usando BalanceService
-      const result = await this.balanceService.confirmPixPayment(txid, txid);
+      // Tenta primeiro com txid como transaction_id, depois como efi_txid
+      let result = await this.balanceService.confirmPixPayment(txid, txid);
+      
+      // Se não encontrou, tenta buscar por efi_txid
+      if (!result.success && result.error?.includes('não encontrada')) {
+        logger.info(`[WEBHOOK] Tentando buscar transação por efi_txid: ${txid}`);
+        result = await this.balanceService.confirmPixPayment('', txid);
+      }
 
       if (!result.success) {
         logger.error(`[WEBHOOK] Erro ao confirmar pagamento ${txid}:`, result.error);
