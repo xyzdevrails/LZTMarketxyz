@@ -146,6 +146,13 @@ export class PixTransactionsStorage {
       transaction => transaction.efi_location_id === locationId
     ) || null;
   }
+
+  /**
+   * Obtém todas as transações (para uso administrativo)
+   */
+  getAllTransactions(): PixTransaction[] {
+    return Array.from(this.transactions.values());
+  }
 }
 
 export const pixTransactionsStorage = new PixTransactionsStorage();

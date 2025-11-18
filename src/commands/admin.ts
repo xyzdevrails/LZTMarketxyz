@@ -149,7 +149,7 @@ export async function execute(
       const statusFilter = interaction.options.getString('status') || 'all';
       
       // Obtém todas as transações do storage
-      const allTransactions = Array.from((pixTransactionsStorage as any).transactions.values());
+      const allTransactions = pixTransactionsStorage.getAllTransactions();
       
       let transactions = allTransactions;
       
@@ -159,7 +159,9 @@ export async function execute(
 
       if (transactions.length === 0) {
         await interaction.editReply({
-          content: `✅ Nenhuma transação PIX encontrada${statusFilter !== 'all' ? ` com status "${statusFilter}"` : ''}.`,
+          content: `✅ Nenhuma transação PIX encontrada${statusFilter !== 'all' ? ` com status "${statusFilter}"` : ''}.\n\n` +
+                   `💡 **Nota:** O arquivo \`pix_transactions.json\` fica no servidor (Railway).\n` +
+                   `Use este comando para visualizar as transações diretamente no Discord.`,
         });
         return;
       }
@@ -178,14 +180,15 @@ export async function execute(
         .setDescription(
           transactionsToShow.map(t => {
             const date = new Date(t.created_at).toLocaleString('pt-BR');
-            const statusEmoji = {
+            const statusEmoji: Record<string, string> = {
               'pending': '⏳',
               'paid': '✅',
               'expired': '❌',
               'cancelled': '🚫'
-            }[t.status] || '❓';
+            };
+            const emoji = statusEmoji[t.status] || '❓';
             
-            return `${statusEmoji} **${t.transaction_id}**\n` +
+            return `${emoji} **${t.transaction_id}**\n` +
                    `👤 <@${t.user_id}> | 💰 R$ ${t.amount.toFixed(2)}\n` +
                    `📅 ${date} | Status: ${t.status}`;
           }).join('\n\n')
