@@ -2,8 +2,10 @@ import {
   ChatInputCommandInteraction,
   SlashCommandBuilder,
   PermissionFlagsBits,
+  EmbedBuilder,
 } from 'discord.js';
 import { PurchaseService } from '../services/purchaseService';
+import { pixTransactionsStorage } from '../storage/pixTransactions';
 import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
@@ -25,7 +27,22 @@ export const data = new SlashCommandBuilder()
     subcommand
       .setName('pedidos-pendentes')
       .setDescription('Lista todos os pedidos pendentes')
-  );
+  )
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('transacoes-pix')
+      .setDescription('Lista transações PIX (pendentes ou todas)')
+      .addStringOption(option =>
+        option
+          .setName('status')
+          .setDescription('Filtrar por status')
+          .addChoices(
+            { name: 'Todas', value: 'all' },
+            { name: 'Pendentes', value: 'pending' },
+            { name: 'Pagas', value: 'paid' }
+          )
+          .setRequired(false)
+      );
 
 export async function execute(
   interaction: ChatInputCommandInteraction,
@@ -120,6 +137,72 @@ export async function execute(
       logger.error('Erro ao listar pedidos', error);
       await interaction.editReply({
         content: `❌ Erro ao listar pedidos: ${error.message}`,
+      });
+    }
+    return;
+  }
+
+  if (subcommand === 'transacoes-pix') {
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const statusFilter = interaction.options.getString('status') || 'all';
+      
+      // Obtém todas as transações do storage
+      const allTransactions = Array.from((pixTransactionsStorage as any).transactions.values());
+      
+      let transactions = allTransactions;
+      
+      if (statusFilter !== 'all') {
+        transactions = allTransactions.filter(t => t.status === statusFilter);
+      }
+
+      if (transactions.length === 0) {
+        await interaction.editReply({
+          content: `✅ Nenhuma transação PIX encontrada${statusFilter !== 'all' ? ` com status "${statusFilter}"` : ''}.`,
+        });
+        return;
+      }
+
+      // Ordena por data (mais recente primeiro)
+      transactions.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      // Limita a 10 transações para não exceder limite do embed
+      const transactionsToShow = transactions.slice(0, 10);
+
+      const embed = new EmbedBuilder()
+        .setTitle(`💳 Transações PIX (${transactions.length} total)`)
+        .setColor(0x00ff00)
+        .setDescription(
+          transactionsToShow.map(t => {
+            const date = new Date(t.created_at).toLocaleString('pt-BR');
+            const statusEmoji = {
+              'pending': '⏳',
+              'paid': '✅',
+              'expired': '❌',
+              'cancelled': '🚫'
+            }[t.status] || '❓';
+            
+            return `${statusEmoji} **${t.transaction_id}**\n` +
+                   `👤 <@${t.user_id}> | 💰 R$ ${t.amount.toFixed(2)}\n` +
+                   `📅 ${date} | Status: ${t.status}`;
+          }).join('\n\n')
+        )
+        .setTimestamp();
+
+      if (transactions.length > 10) {
+        embed.setFooter({ text: `Mostrando 10 de ${transactions.length} transações` });
+      }
+
+      await interaction.editReply({
+        embeds: [embed],
+      });
+    } catch (error: any) {
+      logger.error('Erro ao listar transações PIX', error);
+      await interaction.editReply({
+        content: `❌ Erro ao listar transações: ${error.message}`,
       });
     }
     return;
