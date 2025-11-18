@@ -343,5 +343,63 @@ export async function execute(
     }
     return;
   }
+
+  if (subcommand === 'confirmar-pagamento-pix') {
+    if (!balanceService) {
+      await interaction.reply({
+        content: '❌ **Serviço de saldo não está disponível**\n\n' +
+          'Configure as credenciais da EfiBank no Railway.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const transactionId = interaction.options.getString('transaction_id', true);
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const result = await balanceService.confirmPixPayment(transactionId);
+
+      if (!result.success) {
+        await interaction.editReply({
+          content: `❌ **Erro ao confirmar pagamento PIX:**\n\n${result.error}`,
+        });
+        return;
+      }
+
+      // Busca o usuário para mencionar
+      const user = await interaction.client.users.fetch(result.userId!);
+
+      await interaction.editReply({
+        content: `✅ **Pagamento PIX confirmado com sucesso!**\n\n` +
+          `**ID da Transação:** \`${transactionId}\`\n` +
+          `**Usuário:** <@${result.userId}>\n` +
+          `**Valor:** R$ ${result.amount!.toFixed(2)}\n` +
+          `**Novo Saldo:** R$ ${balanceService.getUserBalance(result.userId!).toFixed(2)}\n\n` +
+          `💰 O saldo foi adicionado à conta do usuário.`,
+      });
+
+      // Envia DM ao usuário confirmando o pagamento
+      try {
+        await user.send(
+          `✅ **Pagamento PIX Confirmado!**\n\n` +
+          `**ID da Transação:** \`${transactionId}\`\n` +
+          `**Valor:** R$ ${result.amount!.toFixed(2)}\n` +
+          `**Seu Saldo Atual:** R$ ${balanceService.getUserBalance(result.userId!).toFixed(2)}\n\n` +
+          `Obrigado pela confiança! 💚`
+        );
+      } catch (dmError) {
+        logger.warn('Não foi possível enviar DM ao usuário', dmError);
+        // Não é crítico, continua normalmente
+      }
+
+    } catch (error: any) {
+      logger.error('Erro ao confirmar pagamento PIX', error);
+      await interaction.editReply({
+        content: `❌ Erro ao processar: ${error.message}`,
+      });
+    }
+    return;
+  }
 }
 
