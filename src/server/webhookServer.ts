@@ -45,12 +45,21 @@ export class WebhookServer {
     // Rota principal de webhook PIX
     this.app.post('/webhook/pix', async (req: Request, res: Response) => {
       try {
-        logger.info('[WEBHOOK] Recebido webhook PIX:', JSON.stringify(req.body, null, 2));
+        logger.info('[WEBHOOK] ========================================');
+        logger.info('[WEBHOOK] Recebido webhook PIX');
+        logger.info('[WEBHOOK] Headers:', JSON.stringify(req.headers, null, 2));
+        logger.info('[WEBHOOK] Body:', JSON.stringify(req.body, null, 2));
+        logger.info('[WEBHOOK] IP:', req.ip);
+        logger.info('[WEBHOOK] ========================================');
         
         // Por enquanto, apenas loga e responde 200
         // TODO: Implementar validação e processamento
         
-        res.status(200).json({ received: true });
+        res.status(200).json({ 
+          received: true,
+          timestamp: new Date().toISOString(),
+          message: 'Webhook recebido com sucesso (processamento será implementado)'
+        });
       } catch (error: any) {
         logger.error('[WEBHOOK] Erro ao processar webhook:', error);
         res.status(500).json({ error: 'Internal server error' });
