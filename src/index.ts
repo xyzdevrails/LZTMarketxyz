@@ -21,12 +21,18 @@ interface Command {
 // Carrega variáveis de ambiente
 dotenv.config();
 
+// Railway usa PORT, mas podemos usar WEBHOOK_PORT como fallback
+const WEBHOOK_PORT = parseInt(process.env.PORT || process.env.WEBHOOK_PORT || '3000', 10);
+const WEBHOOK_ENABLED = process.env.WEBHOOK_ENABLED === 'true';
+
 // Debug: Verifica variáveis importantes (remover depois)
 logger.info(`[DEBUG] Variáveis de ambiente:`);
 logger.info(`[DEBUG]   EFI_CLIENT_ID: ${process.env.EFI_CLIENT_ID ? 'CONFIGURADO' : 'NÃO CONFIGURADO'}`);
 logger.info(`[DEBUG]   EFI_CLIENT_SECRET: ${process.env.EFI_CLIENT_SECRET ? 'CONFIGURADO' : 'NÃO CONFIGURADO'}`);
-logger.info(`[DEBUG]   WEBHOOK_ENABLED: ${process.env.WEBHOOK_ENABLED || 'false'}`);
-logger.info(`[DEBUG]   WEBHOOK_PORT: ${process.env.WEBHOOK_PORT || '3000 (padrão)'}`);
+logger.info(`[DEBUG]   WEBHOOK_ENABLED: ${WEBHOOK_ENABLED}`);
+logger.info(`[DEBUG]   PORT (Railway): ${process.env.PORT || 'não configurado'}`);
+logger.info(`[DEBUG]   WEBHOOK_PORT: ${process.env.WEBHOOK_PORT || 'não configurado'}`);
+logger.info(`[DEBUG]   Porta do webhook: ${WEBHOOK_PORT}`);
 
 // Validação de variáveis obrigatórias
 if (!process.env.DISCORD_BOT_TOKEN) {
@@ -104,8 +110,6 @@ commands.set(meusaldoCommand.data.name, meusaldoCommand as Command);
 
 // Inicializa servidor webhook (será inicializado após bot estar pronto)
 let webhookServer: any = null;
-const WEBHOOK_PORT = parseInt(process.env.WEBHOOK_PORT || '3000', 10);
-const WEBHOOK_ENABLED = process.env.WEBHOOK_ENABLED === 'true';
 
 // Evento: Bot pronto
 client.once(Events.ClientReady, async (readyClient) => {
