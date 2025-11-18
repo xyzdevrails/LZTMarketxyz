@@ -42,7 +42,8 @@ export const data = new SlashCommandBuilder()
             { name: 'Pagas', value: 'paid' }
           )
           .setRequired(false)
-      );
+      )
+  );
 
 export async function execute(
   interaction: ChatInputCommandInteraction,
