@@ -21,6 +21,12 @@ interface Command {
 // Carrega variáveis de ambiente
 dotenv.config();
 
+// Debug: Verifica variáveis de webhook (remover depois)
+if (process.env.WEBHOOK_ENABLED) {
+  logger.info(`[DEBUG] WEBHOOK_ENABLED: ${process.env.WEBHOOK_ENABLED}`);
+  logger.info(`[DEBUG] WEBHOOK_PORT: ${process.env.WEBHOOK_PORT || '3000 (padrão)'}`);
+}
+
 // Validação de variáveis obrigatórias
 if (!process.env.DISCORD_BOT_TOKEN) {
   logger.error('DISCORD_BOT_TOKEN não encontrado no .env');
