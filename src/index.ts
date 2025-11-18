@@ -112,11 +112,20 @@ client.once(Events.ClientReady, async (readyClient) => {
   // Registra comandos slash
   try {
     const commandsData = Array.from(commands.values()).map((cmd) => cmd.data);
-    logger.info(`Registrando ${commandsData.length} comandos:`, commandsData.map((c) => c.name));
+    logger.info(`[COMANDOS] Registrando ${commandsData.length} comandos:`);
+    commandsData.forEach(cmd => {
+      logger.info(`[COMANDOS]   - /${cmd.name}: ${cmd.description}`);
+      // Log detalhado dos parâmetros
+      if (cmd.options && cmd.options.length > 0) {
+        cmd.options.forEach((opt: any) => {
+          logger.info(`[COMANDOS]     └─ ${opt.name} (${opt.type === 3 ? 'STRING' : opt.type === 4 ? 'NUMBER' : opt.type}): ${opt.description}`);
+        });
+      }
+    });
     
     // Tenta registrar comandos globalmente primeiro
     await readyClient.application?.commands.set(commandsData);
-    logger.info('Comandos slash registrados globalmente!');
+    logger.info('[COMANDOS] Comandos slash registrados globalmente!');
     
     // Também registra em cada servidor (mais rápido para aparecer)
     const guilds = await readyClient.guilds.fetch();
