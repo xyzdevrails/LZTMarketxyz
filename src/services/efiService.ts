@@ -410,7 +410,13 @@ export class EfiService {
       logger.info('[EFI] Token OAuth obtido com sucesso');
 
       // Faz chamada PUT para registrar webhook
-      logger.info(`[EFI] Fazendo PUT para: ${url}`);
+      logger.info(`[EFI] ========================================`);
+      logger.info(`[EFI] Fazendo PUT para registrar webhook:`);
+      logger.info(`[EFI]   URL: ${url}`);
+      logger.info(`[EFI]   Payload: ${JSON.stringify(requestData, null, 2)}`);
+      logger.info(`[EFI]   Headers: ${JSON.stringify(headers, null, 2)}`);
+      logger.info(`[EFI] ========================================`);
+      
       const response = await axios.put(
         url,
         requestData,
@@ -429,13 +435,34 @@ export class EfiService {
       return response.data || response;
     } catch (error: any) {
       let errorMessage = 'Erro desconhecido';
+      let errorDetails = '';
       
       if (error.response) {
         const status = error.response.status;
         const data = error.response.data;
+        const headers = error.response.headers;
+        
+        logger.error(`[EFI] ========================================`);
+        logger.error(`[EFI] Erro ao registrar webhook:`);
+        logger.error(`[EFI]   Status: ${status}`);
+        logger.error(`[EFI]   Resposta: ${JSON.stringify(data, null, 2)}`);
+        logger.error(`[EFI]   Headers: ${JSON.stringify(headers, null, 2)}`);
+      logger.error(`[EFI]   URL tentada: ${error.config?.url || 'N/A'}`);
+      logger.error(`[EFI]   Payload enviado: ${JSON.stringify(error.config?.data || 'N/A', null, 2)}`);
+      logger.error(`[EFI] ========================================`);
+        
+        errorDetails = JSON.stringify(data, null, 2);
         
         if (status === 400) {
-          errorMessage = `URL inválida ou configuração incorreta: ${JSON.stringify(data)}`;
+          // Tenta extrair mensagem mais específica
+          if (data?.nome && data?.mensagem) {
+            errorMessage = `${data.nome}: ${data.mensagem}`;
+          } else if (data?.erros && Array.isArray(data.erros)) {
+            const erros = data.erros.map((e: any) => `${e.caminho || ''}: ${e.mensagem || ''}`).join(', ');
+            errorMessage = `Erro de validação: ${erros}`;
+          } else {
+            errorMessage = `URL inválida ou configuração incorreta: ${JSON.stringify(data)}`;
+          }
         } else if (status === 403) {
           errorMessage = 'Acesso negado. Verifique se tem a permissão "Alterar Webhooks" habilitada no painel da EfiBank.';
         } else if (status === 404) {
@@ -445,11 +472,16 @@ export class EfiService {
         }
       } else if (error.message) {
         errorMessage = error.message;
+        logger.error(`[EFI] Erro sem resposta HTTP: ${error.message}`);
+        logger.error(`[EFI] Stack: ${error.stack}`);
       } else {
         errorMessage = JSON.stringify(error);
       }
       
       logger.error(`[EFI] ❌ Erro ao registrar webhook: ${errorMessage}`);
+      if (errorDetails) {
+        logger.error(`[EFI] Detalhes: ${errorDetails}`);
+      }
       throw new Error(`Erro ao registrar webhook: ${errorMessage}`);
     }
   }
@@ -509,6 +541,7 @@ export class EfiService {
 
       try {
         // Obtém token OAuth
+        logger.info(`[EFI] Obtendo token OAuth para consultar webhook...`);
         const tokenResponse = await axios.post(
           tokenUrl,
           'grant_type=client_credentials',
@@ -530,6 +563,7 @@ export class EfiService {
           return null;
         }
 
+        logger.info(`[EFI] Fazendo GET para consultar webhook: ${url}`);
         // Faz chamada GET
         const response = await axios.get(url, {
           httpsAgent,
@@ -542,10 +576,26 @@ export class EfiService {
         return response.data;
       } catch (error: any) {
         if (error.response?.status === 404) {
-          logger.info('[EFI] Webhook não está registrado ainda');
+          logger.info('[EFI] Webhook não está registrado ainda (404)');
           return null;
         }
-        logger.error(`[EFI] Erro ao consultar webhook: ${error.message || error}`);
+        
+        // Log detalhado do erro
+        if (error.response) {
+          logger.error(`[EFI] Erro ao consultar webhook:`);
+          logger.error(`[EFI]   Status: ${error.response.status}`);
+          logger.error(`[EFI]   Resposta: ${JSON.stringify(error.response.data, null, 2)}`);
+          logger.error(`[EFI]   URL: ${url}`);
+        } else {
+          logger.error(`[EFI] Erro ao consultar webhook: ${error.message || error}`);
+        }
+        
+        // Se for 400, não lança erro, apenas retorna null (pode ser que a chave não suporte webhook)
+        if (error.response?.status === 400) {
+          logger.warn('[EFI] Erro 400 ao consultar webhook - pode ser que a chave não suporte webhook ou formato inválido');
+          return null;
+        }
+        
         throw error;
       }
     } catch (error: any) {

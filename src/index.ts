@@ -121,10 +121,15 @@ client.once(Events.ClientReady, async (readyClient) => {
                 : null);
             
             if (webhookUrl) {
+              logger.info(`[WEBHOOK] ========================================`);
               logger.info(`[WEBHOOK] Tentando registrar webhook automaticamente na EfiBank...`);
-              logger.info(`[WEBHOOK] URL: ${webhookUrl}`);
+              logger.info(`[WEBHOOK] URL do webhook: ${webhookUrl}`);
+              logger.info(`[WEBHOOK] Chave PIX: ${process.env.EFI_PIX_KEY ? `${process.env.EFI_PIX_KEY.substring(0, 10)}...${process.env.EFI_PIX_KEY.substring(process.env.EFI_PIX_KEY.length - 4)}` : 'NÃO CONFIGURADA'}`);
+              logger.info(`[WEBHOOK] Ambiente: ${process.env.EFI_SANDBOX === 'true' ? 'SANDBOX' : 'PRODUÇÃO'}`);
+              logger.info(`[WEBHOOK] ========================================`);
               
               // Verifica se já está registrado
+              logger.info(`[WEBHOOK] Verificando se webhook já está registrado...`);
               const existingWebhook = await efiService.getWebhook();
               // Remove ?ignorar= da comparação, pois pode estar presente na URL registrada
               const normalizeUrl = (url: string) => url.replace(/\?ignorar=.*$/, '').replace(/\/$/, '');
