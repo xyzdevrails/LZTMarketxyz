@@ -43,6 +43,17 @@ export const data = new SlashCommandBuilder()
           )
           .setRequired(false)
       )
+  )
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('transacao-pix')
+      .setDescription('Visualiza detalhes de uma transação PIX específica')
+      .addStringOption(option =>
+        option
+          .setName('transaction_id')
+          .setDescription('ID da transação (ex: pix_3350c5aa-aaa9-45f2-af3d-7f60c65b9dfd)')
+          .setRequired(true)
+      )
   );
 
 export async function execute(
@@ -207,6 +218,115 @@ export async function execute(
       logger.error('Erro ao listar transações PIX', error);
       await interaction.editReply({
         content: `❌ Erro ao listar transações: ${error.message}`,
+      });
+    }
+    return;
+  }
+
+  if (subcommand === 'transacao-pix') {
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      const transactionId = interaction.options.getString('transaction_id', true);
+      
+      // Busca a transação específica
+      const transaction = pixTransactionsStorage.getTransaction(transactionId);
+
+      if (!transaction) {
+        await interaction.editReply({
+          content: `❌ **Transação não encontrada!**\n\n` +
+                   `ID informado: \`${transactionId}\`\n\n` +
+                   `💡 **Dica:** Use \`/admin transacoes-pix\` para ver todas as transações e seus IDs.`,
+        });
+        return;
+      }
+
+      // Formata data
+      const createdDate = new Date(transaction.created_at).toLocaleString('pt-BR');
+      const paidDate = transaction.paid_at 
+        ? new Date(transaction.paid_at).toLocaleString('pt-BR')
+        : 'N/A';
+
+      // Emoji de status
+      const statusEmoji: Record<string, string> = {
+        'pending': '⏳',
+        'paid': '✅',
+        'expired': '❌',
+        'cancelled': '🚫'
+      };
+      const emoji = statusEmoji[transaction.status] || '❓';
+
+      const embed = new EmbedBuilder()
+        .setTitle(`${emoji} Detalhes da Transação PIX`)
+        .setColor(
+          transaction.status === 'paid' ? 0x00ff00 :
+          transaction.status === 'pending' ? 0xffaa00 :
+          transaction.status === 'expired' ? 0xff0000 :
+          0x808080
+        )
+        .addFields(
+          {
+            name: '📋 ID da Transação',
+            value: `\`${transaction.transaction_id}\``,
+            inline: false
+          },
+          {
+            name: '👤 Usuário',
+            value: `<@${transaction.user_id}>`,
+            inline: true
+          },
+          {
+            name: '💰 Valor',
+            value: `R$ ${transaction.amount.toFixed(2)}`,
+            inline: true
+          },
+          {
+            name: '📊 Status',
+            value: `${emoji} ${transaction.status}`,
+            inline: true
+          },
+          {
+            name: '📅 Criada em',
+            value: createdDate,
+            inline: true
+          },
+          {
+            name: '✅ Paga em',
+            value: paidDate,
+            inline: true
+          },
+          {
+            name: '🔑 Chave PIX',
+            value: `\`\`\`\n${transaction.pix_key}\`\`\``,
+            inline: false
+          }
+        )
+        .setTimestamp();
+
+      // Adiciona informações da EfiBank se disponíveis
+      if (transaction.efi_txid) {
+        embed.addFields({
+          name: '🏦 EfiBank TXID',
+          value: `\`${transaction.efi_txid}\``,
+          inline: false
+        });
+      }
+
+      if (transaction.efi_location_id) {
+        embed.addFields({
+          name: '📍 Location ID',
+          value: `\`${transaction.efi_location_id}\``,
+          inline: true
+        });
+      }
+
+      await interaction.editReply({
+        embeds: [embed],
+      });
+    } catch (error: any) {
+      logger.error('Erro ao buscar transação PIX', error);
+      await interaction.editReply({
+        content: `❌ Erro ao buscar transação: ${error.message}`,
       });
     }
     return;
