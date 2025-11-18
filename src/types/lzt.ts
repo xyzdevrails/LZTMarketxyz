@@ -1,7 +1,4 @@
-/**
- * Tipos TypeScript para a API do LZT Market
- * Baseado na documentação: https://lzt-market.readme.io/reference/information
- */
+
 
 export interface LZTResponse<T = any> {
   status_code: number;
@@ -17,7 +14,7 @@ export interface LZTError {
 
 export interface LZTAccount {
   item_id: number;
-  item_state: string; // active, paid, closed, etc.
+  item_state: string; 
   title: string;
   price: number;
   currency: string;
@@ -85,7 +82,7 @@ export interface LZTAccount {
       image_url?: string;
     }>;
   };
-  // Campos específicos do Riot/Valorant
+  
   riot_item_id?: number;
   riot_id?: string;
   riot_account_verified?: number;
@@ -94,9 +91,9 @@ export interface LZTAccount {
   riot_country?: string;
   riot_password_change?: number;
   riot_last_activity?: number;
-  riot_valorant_wallet_vp?: number; // Valorant Points
-  riot_valorant_wallet_rp?: number; // Radianite Points
-  riot_valorant_wallet_fa?: number; // Free Agents
+  riot_valorant_wallet_vp?: number; 
+  riot_valorant_wallet_rp?: number; 
+  riot_valorant_wallet_fa?: number; 
   tags?: Array<{
     tag_id: number;
     tag_name: string;
@@ -121,14 +118,14 @@ export interface LZTSearchFilters {
   search?: string;
   page?: number;
   per_page?: number;
-  // Parâmetros específicos da API LZT
-  pmin?: number; // Preço mínimo (inclusive)
-  pmax?: number; // Preço máximo (inclusive)
-  title?: string; // Palavras no título
+  
+  pmin?: number; 
+  pmax?: number; 
+  title?: string; 
   order_by?: 'price_to_up' | 'price_to_down' | 'pdate_to_down' | 'pdate_to_up' | 'pdate_to_down_upload' | 'pdate_to_up_upload' | 'edate_to_up' | 'edate_to_down' | 'ddate_to_up' | 'ddate_to_down';
-  // Parâmetros específicos do Valorant
-  rmin?: number; // Rank mínimo (3-27)
-  rmax?: number; // Rank máximo (3-27)
+  
+  rmin?: number; 
+  rmax?: number; 
 }
 
 export interface LZTSearchResponse {
@@ -148,7 +145,7 @@ export interface LZTSearchResponse {
     visitor_id: number;
     time: number;
   };
-  // Compatibilidade com código existente
+  
   pagination?: {
     current_page: number;
     per_page: number;

@@ -4,12 +4,6 @@ import { WebhookHandler } from '../handlers/webhookHandler';
 import { BalanceService } from '../services/balanceService';
 import { Client } from 'discord.js';
 
-/**
- * Servidor HTTP para receber webhooks da EfiBank
- * 
- * Documentação EfiBank Webhooks:
- * https://dev.efipay.com.br/docs/api-pix/webhooks
- */
 export class WebhookServer {
   private app: express.Application;
   private port: number;
@@ -24,7 +18,6 @@ export class WebhookServer {
     this.app = express();
     this.port = port;
     
-    // Inicializa handler se serviços estiverem disponíveis
     if (balanceService && discordClient) {
       this.webhookHandler = new WebhookHandler(balanceService, discordClient);
       logger.info('[WEBHOOK] WebhookHandler inicializado com sucesso');
@@ -36,30 +29,20 @@ export class WebhookServer {
     this.setupRoutes();
   }
 
-  /**
-   * Configura middleware do Express
-   */
   private setupMiddleware(): void {
-    // Middleware para parsear JSON (webhooks da EfiBank vêm como JSON)
     this.app.use(express.json());
     
-    // Middleware para logging de todas as requisições
     this.app.use((req: Request, res: Response, next) => {
       logger.info(`[WEBHOOK] ${req.method} ${req.path} - IP: ${req.ip}`);
       next();
     });
   }
 
-  /**
-   * Configura rotas do servidor
-   */
   private setupRoutes(): void {
-    // Rota de health check
     this.app.get('/health', (req: Request, res: Response) => {
       res.json({ status: 'ok', service: 'webhook-server' });
     });
 
-    // Rota principal de webhook PIX
     this.app.post('/webhook/pix', async (req: Request, res: Response) => {
       try {
         logger.info('[WEBHOOK] ========================================');
@@ -69,7 +52,6 @@ export class WebhookServer {
         logger.info('[WEBHOOK] IP:', req.ip);
         logger.info('[WEBHOOK] ========================================');
         
-        // Se handler estiver disponível, processa o webhook
         if (this.webhookHandler) {
           const result = await this.webhookHandler.processPixWebhook(req.body);
           
@@ -83,7 +65,6 @@ export class WebhookServer {
             });
           } else {
             logger.error(`[WEBHOOK] Erro ao processar webhook: ${result.message}`);
-            // Ainda responde 200 para não fazer EfiBank reenviar
             res.status(200).json({ 
               received: true,
               processed: false,
@@ -92,7 +73,6 @@ export class WebhookServer {
             });
           }
         } else {
-          // Handler não disponível, apenas loga
           logger.warn('[WEBHOOK] WebhookHandler não disponível, apenas logando');
           res.status(200).json({ 
             received: true,
@@ -103,7 +83,6 @@ export class WebhookServer {
         }
       } catch (error: any) {
         logger.error('[WEBHOOK] Erro ao processar webhook:', error);
-        // Responde 200 para não fazer EfiBank reenviar em caso de erro interno
         res.status(200).json({ 
           received: true,
           processed: false,
@@ -113,16 +92,12 @@ export class WebhookServer {
       }
     });
 
-    // Rota para testar webhook manualmente
     this.app.post('/webhook/test', (req: Request, res: Response) => {
       logger.info('[WEBHOOK] Teste recebido:', req.body);
       res.json({ message: 'Test webhook received', body: req.body });
     });
   }
 
-  /**
-   * Inicia o servidor
-   */
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
@@ -145,9 +120,6 @@ export class WebhookServer {
     });
   }
 
-  /**
-   * Para o servidor
-   */
   stop(): Promise<void> {
     return new Promise((resolve) => {
       if (this.server) {
@@ -161,9 +133,6 @@ export class WebhookServer {
     });
   }
 
-  /**
-   * Obtém a aplicação Express (para testes)
-   */
   getApp(): express.Application {
     return this.app;
   }

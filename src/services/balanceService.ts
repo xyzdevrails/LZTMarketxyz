@@ -4,15 +4,9 @@ import { EfiService } from './efiService';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 
-/**
- * Serviço de gerenciamento de saldos e transações PIX
- */
 export class BalanceService {
   constructor(private efiService: EfiService) {}
 
-  /**
-   * Cria uma transação PIX para adicionar saldo
-   */
   async createPixTransaction(
     userId: string,
     amount: number
@@ -24,7 +18,7 @@ export class BalanceService {
     error?: string;
   }> {
     try {
-      // Valida valor mínimo
+      
       if (amount < 1) {
         return {
           success: false,
@@ -32,30 +26,25 @@ export class BalanceService {
         };
       }
 
-      // Gera ID único para a transação
       const transactionId = `pix_${uuidv4()}`;
 
-      // Cria cobrança na EfiBank
       const charge = await this.efiService.createCharge({
         txid: transactionId,
         valor: amount,
         solicitacaoPagador: `Adição de saldo - Usuário ${userId}`,
       });
 
-      // Gera QR Code
       let qrCodeData;
       try {
         qrCodeData = await this.efiService.generateQRCode(charge.location);
       } catch (qrError: any) {
         logger.error('Erro ao gerar QR Code após criar cobrança', qrError);
-        // Se falhar ao gerar QR Code, ainda retorna sucesso mas com erro específico
+        
         throw new Error(`Cobrança criada com sucesso, mas falhou ao gerar QR Code: ${qrError.message || qrError}`);
       }
 
-      // Obtém chave PIX (da cobrança ou configuração)
       const pixKey = charge.chave || process.env.EFI_PIX_KEY || 'Chave PIX não configurada';
 
-      // Registra transação como pendente
       await pixTransactionsStorage.createTransaction({
         transaction_id: transactionId,
         user_id: userId,
@@ -85,9 +74,6 @@ export class BalanceService {
     }
   }
 
-  /**
-   * Confirma pagamento PIX e adiciona saldo ao usuário
-   */
   async confirmPixPayment(
     transactionId: string,
     efiTxid?: string
@@ -98,10 +84,9 @@ export class BalanceService {
     error?: string;
   }> {
     try {
-      // Busca transação
-      let transaction = pixTransactionsStorage.getTransaction(transactionId);
       
-      // Se não encontrou por transactionId, tenta por txid da EfiBank
+      let transaction = pixTransactionsStorage.getTransaction(transactionId);
+
       if (!transaction && efiTxid) {
         transaction = pixTransactionsStorage.getTransactionByEfiTxid(efiTxid);
       }
@@ -120,10 +105,8 @@ export class BalanceService {
         };
       }
 
-      // Atualiza status da transação
       await pixTransactionsStorage.updateTransactionStatus(transactionId, 'paid');
 
-      // Adiciona saldo ao usuário
       await userBalancesStorage.addBalance(
         transaction.user_id,
         transaction.amount,
@@ -147,24 +130,15 @@ export class BalanceService {
     }
   }
 
-  /**
-   * Obtém saldo de um usuário
-   */
   getUserBalance(userId: string): number {
     return userBalancesStorage.getBalance(userId);
   }
 
-  /**
-   * Verifica se usuário tem saldo suficiente
-   */
   hasSufficientBalance(userId: string, amount: number): boolean {
     const balance = this.getUserBalance(userId);
     return balance >= amount;
   }
 
-  /**
-   * Debita saldo de um usuário
-   */
   async debitUserBalance(
     userId: string,
     amount: number,
@@ -179,9 +153,6 @@ export class BalanceService {
     return result;
   }
 
-  /**
-   * Reembolsa saldo de um usuário
-   */
   async refundUserBalance(
     userId: string,
     amount: number,

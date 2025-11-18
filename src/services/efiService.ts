@@ -3,10 +3,6 @@ import { logger } from '../utils/logger';
 import fs from 'fs';
 import path from 'path';
 
-/**
- * Serviço de integração com EfiBank (Efí Pay)
- * Documentação: https://dev.efipay.com.br/docs/api-pix
- */
 export class EfiService {
   private efipay: EfiPay;
   private sandbox: boolean;
@@ -19,7 +15,6 @@ export class EfiService {
     const sandboxEnv = process.env.EFI_SANDBOX;
     this.sandbox = sandboxEnv === 'true';
 
-    // Log de diagnóstico
     logger.info(`[EFI] Configuração detectada:`);
     logger.info(`[EFI] EFI_SANDBOX (raw): "${sandboxEnv}"`);
     logger.info(`[EFI] EFI_SANDBOX (parsed): ${this.sandbox} (${this.sandbox ? 'SANDBOX' : 'PRODUÇÃO'})`);
@@ -32,17 +27,16 @@ export class EfiService {
       throw new Error('EFI_CLIENT_ID e EFI_CLIENT_SECRET são obrigatórios');
     }
 
-    // Se certificado em base64 está configurado, salva temporariamente
     let tempCertPath: string | null = null;
     if (certificateBase64) {
       try {
-        // Remove TODOS os espaços, quebras de linha, tabs, etc do base64
+        
         const cleanBase64 = certificateBase64
-          .replace(/\s/g, '') // Remove todos os espaços em branco
-          .replace(/\n/g, '')  // Remove quebras de linha
-          .replace(/\r/g, '')  // Remove carriage return
-          .replace(/\t/g, '')  // Remove tabs
-          .trim();              // Remove espaços no início/fim
+          .replace(/\s/g, '') 
+          .replace(/\n/g, '')  
+          .replace(/\r/g, '')  
+          .replace(/\t/g, '')  
+          .trim();              
         
         logger.info(`Processando certificado base64 (tamanho original: ${certificateBase64.length}, limpo: ${cleanBase64.length})`);
         
@@ -51,13 +45,11 @@ export class EfiService {
         }
         
         const certBuffer = Buffer.from(cleanBase64, 'base64');
-        
-        // Valida se o buffer tem conteúdo válido
+
         if (certBuffer.length === 0) {
           throw new Error('Falha ao decodificar certificado base64 - buffer vazio');
         }
-        
-        // Valida tamanho mínimo de um certificado .p12 (geralmente > 1000 bytes)
+
         if (certBuffer.length < 500) {
           logger.warn(`Certificado parece muito pequeno: ${certBuffer.length} bytes`);
         }
@@ -65,8 +57,7 @@ export class EfiService {
         tempCertPath = path.join(process.cwd(), 'temp_certificado.p12');
         fs.writeFileSync(tempCertPath, certBuffer);
         logger.info(`Certificado carregado de variável de ambiente (base64) - ${certBuffer.length} bytes salvos em ${tempCertPath}`);
-        
-        // Verifica se o arquivo foi criado corretamente
+
         if (!fs.existsSync(tempCertPath)) {
           throw new Error('Falha ao criar arquivo temporário do certificado');
         }
@@ -79,7 +70,7 @@ export class EfiService {
         throw new Error(`Erro ao processar certificado base64: ${error.message}`);
       }
     } else {
-      // Verifica se o certificado existe no caminho especificado
+      
       if (!fs.existsSync(certificatePath)) {
         const errorMsg = `Certificado não encontrado em: ${certificatePath}. É necessário o arquivo .p12 da EfiBank ou configurar EFI_CERTIFICATE_BASE64.`;
         logger.error(errorMsg);
@@ -96,7 +87,6 @@ export class EfiService {
       certificate: finalCertPath,
     };
 
-    // Adiciona senha do certificado se configurada
     if (process.env.EFI_CERTIFICATE_PASSWORD) {
       options.certificate_password = process.env.EFI_CERTIFICATE_PASSWORD;
     }
@@ -121,31 +111,26 @@ export class EfiService {
     }
   }
 
-  /**
-   * Cria uma cobrança PIX imediata (COB)
-   * Documentação: https://dev.efipay.com.br/docs/api-pix/cobrancas-imediatas
-   */
   async createCharge(params: {
-    txid?: string; // Opcional: se não fornecido, EfiBank gera automaticamente
-    valor: number; // Valor em reais (será convertido para centavos)
-    chave?: string; // Chave PIX (opcional, usa a chave padrão da conta)
-    solicitacaoPagador?: string; // Descrição do pagamento
+    txid?: string; 
+    valor: number; 
+    chave?: string; 
+    solicitacaoPagador?: string; 
   }): Promise<{
     txid: string;
-    location: number; // Location ID para gerar QR Code
+    location: number; 
     status: string;
     valor: { original: string };
     chave: string;
     solicitacaoPagador?: string;
   }> {
     try {
-      // Log de diagnóstico antes de criar cobrança
+      
       logger.info(`[EFI] Criando cobrança PIX:`);
       logger.info(`[EFI]   - Ambiente: ${this.sandbox ? 'SANDBOX' : 'PRODUÇÃO'}`);
       logger.info(`[EFI]   - Valor: R$ ${params.valor} (${Math.round(params.valor * 100)} centavos)`);
       logger.info(`[EFI]   - TXID: ${params.txid || 'Será gerado pela EfiBank'}`);
-      
-      // Valida e obtém chave PIX (obrigatória)
+
       const pixKey = params.chave || process.env.EFI_PIX_KEY;
       if (!pixKey) {
         const errorMsg = 'Chave PIX não configurada. Configure EFI_PIX_KEY no Railway ou forneça via parâmetro.';
@@ -159,12 +144,12 @@ export class EfiService {
 
       const chargeData: any = {
         calendario: {
-          expiracao: 3600, // 1 hora de validade
+          expiracao: 3600, 
         },
         valor: {
           original: valorEmCentavos.toFixed(2),
         },
-        chave: pixKey, // Chave PIX (obrigatória)
+        chave: pixKey, 
       };
 
       if (params.solicitacaoPagador) {
@@ -174,11 +159,11 @@ export class EfiService {
       let response;
 
       if (params.txid) {
-        // Usa PUT para criar com txid próprio
+        
         logger.info(`[EFI] Criando cobrança PIX com txid: ${params.txid}`);
         response = await this.efipay.pixCreateImmediateCharge({ txid: params.txid }, chargeData);
       } else {
-        // Usa POST para criar sem txid (EfiBank gera)
+        
         logger.info(`[EFI] Criando cobrança PIX (EfiBank gerará txid)`);
         response = await this.efipay.pixCreateImmediateCharge({}, chargeData);
       }
@@ -202,12 +187,10 @@ export class EfiService {
     } catch (error: any) {
       logger.error('Erro ao criar cobrança PIX', error);
       logger.error('Detalhes do erro:', JSON.stringify(error, null, 2));
-      
-      // Mensagem de erro mais específica
+
       let errorMessage = error.message || 'Erro desconhecido';
       let errorObj: any = {};
-      
-      // Tenta extrair informações do erro
+
       try {
         if (typeof error === 'string') {
           errorObj = JSON.parse(error);
@@ -215,10 +198,9 @@ export class EfiService {
           errorObj = error;
         }
       } catch (e) {
-        // Ignora se não conseguir parsear
+        
       }
-      
-      // Trata erros específicos
+
       if (errorObj.error === 'invalid_client' || errorMessage.includes('Invalid or inactive credentials')) {
         errorMessage = 'Credenciais inválidas ou inativas\n\n';
         errorMessage += '💡 Possíveis causas:\n';
@@ -252,16 +234,12 @@ export class EfiService {
     }
   }
 
-  /**
-   * Gera QR Code de uma cobrança usando Location ID
-   * Documentação: https://dev.efipay.com.br/docs/api-pix/payload-locations
-   */
   async generateQRCode(locationId: number | string): Promise<{
-    qrcode: string; // QR Code em base64 ou texto
-    imagemQrcode?: string; // URL da imagem do QR Code (se disponível)
+    qrcode: string; 
+    imagemQrcode?: string; 
   }> {
     try {
-      // Garante que locationId seja um número (a API pode retornar string)
+      
       const locationIdNumber = typeof locationId === 'string' ? parseInt(locationId, 10) : locationId;
       
       if (isNaN(locationIdNumber)) {
@@ -285,8 +263,7 @@ export class EfiService {
     } catch (error: any) {
       logger.error('[EFI] Erro ao gerar QR Code', error);
       logger.error('[EFI] Detalhes do erro:', JSON.stringify(error, null, 2));
-      
-      // Extrai mensagem de erro de forma mais robusta
+
       let errorMessage = 'Erro desconhecido ao gerar QR Code';
       
       if (error) {
@@ -297,7 +274,7 @@ export class EfiService {
         } else if (error.error) {
           errorMessage = typeof error.error === 'string' ? error.error : JSON.stringify(error.error);
         } else if (error.nome || error.mensagem) {
-          // Formato de erro da EfiBank
+          
           errorMessage = `${error.nome || 'Erro'}: ${error.mensagem || JSON.stringify(error)}`;
         } else {
           try {
@@ -312,9 +289,6 @@ export class EfiService {
     }
   }
 
-  /**
-   * Consulta uma cobrança por txid
-   */
   async getCharge(txid: string): Promise<any> {
     try {
       logger.info(`Consultando cobrança: ${txid}`);

@@ -32,7 +32,6 @@ export async function execute(
 
     const embed = createAccountEmbed(account);
 
-    // Botões de ação
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(`buy_account_${account.item_id}`)

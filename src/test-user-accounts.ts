@@ -6,9 +6,8 @@ dotenv.config();
 
 async function testUserAccounts() {
   const token = process.env.LZT_API_TOKEN;
-  const baseURL = process.env.LZT_API_BASE_URL || 'https://api.lzt.market';
+  const baseURL = process.env.LZT_API_BASE_URL || 'https:
 
-  // Primeiro obtém o user_id do perfil
   logger.info('Obtendo informações do usuário...');
   try {
     const userResponse = await axios.get(`${baseURL}/user`, {
@@ -27,7 +26,7 @@ async function testUserAccounts() {
     logger.info(`User ID: ${userId}`);
 
     if (userId) {
-      // Tenta listar contas do usuário
+      
       const endpoints = [
         `/user/${userId}/items`,
         `/market/user/${userId}/items`,

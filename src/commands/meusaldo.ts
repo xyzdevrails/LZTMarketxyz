@@ -19,8 +19,7 @@ export async function execute(
   try {
     const userId = interaction.user.id;
     const balance = balanceService.getUserBalance(userId);
-    
-    // Busca transações recentes do usuário
+
     const { userBalancesStorage } = await import('../storage/userBalances');
     const recentTransactions = userBalancesStorage.getTransactions(userId, 5);
 
@@ -30,7 +29,6 @@ export async function execute(
       .setDescription(`**Saldo Atual:** R$ ${balance.toFixed(2)}`)
       .setTimestamp();
 
-    // Adiciona histórico recente se houver
     if (recentTransactions.length > 0) {
       const transactionsList = recentTransactions
         .slice(0, 5)

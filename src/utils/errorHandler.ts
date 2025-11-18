@@ -1,10 +1,6 @@
 import { logger } from './logger';
 import { LZTError } from '../types/lzt';
 
-/**
- * Tratamento centralizado de erros da API LZT
- */
-
 export class LZTAPIError extends Error {
   constructor(
     public statusCode: number,
@@ -30,7 +26,6 @@ export function handleLZTError(error: any): LZTAPIError {
       message = errorData.error.message || 'Erro na API LZT';
     }
 
-    // Mensagens específicas por status code
     switch (statusCode) {
       case 401:
         message = 'Token de autenticação inválido ou expirado';

@@ -5,9 +5,6 @@ import { logger } from '../utils/logger';
 
 const ORDERS_FILE = path.join(process.cwd(), 'orders.json');
 
-/**
- * Sistema de storage de pedidos usando JSON file
- */
 export class OrderStorage {
   private orders: Map<string, LZTOrder> = new Map();
 
@@ -15,9 +12,6 @@ export class OrderStorage {
     this.loadOrders();
   }
 
-  /**
-   * Carrega pedidos do arquivo JSON
-   */
   private async loadOrders(): Promise<void> {
     try {
       const data = await fs.readFile(ORDERS_FILE, 'utf-8');
@@ -31,7 +25,6 @@ export class OrderStorage {
       logger.info(`Carregados ${this.orders.size} pedidos do storage`);
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        // Arquivo não existe ainda, criar vazio
         await this.saveOrders();
         logger.info('Arquivo de pedidos criado');
       } else {
@@ -40,9 +33,6 @@ export class OrderStorage {
     }
   }
 
-  /**
-   * Salva pedidos no arquivo JSON
-   */
   private async saveOrders(): Promise<void> {
     try {
       const ordersArray = Array.from(this.orders.values());
@@ -53,9 +43,6 @@ export class OrderStorage {
     }
   }
 
-  /**
-   * Cria um novo pedido
-   */
   async createOrder(order: Omit<LZTOrder, 'created_at'>): Promise<LZTOrder> {
     const newOrder: LZTOrder = {
       ...order,
@@ -69,9 +56,7 @@ export class OrderStorage {
     return newOrder;
   }
 
-  /**
-   * Atualiza status de um pedido
-   */
+ 
   async updateOrderStatus(orderId: string, status: LZTOrder['status']): Promise<LZTOrder | null> {
     const order = this.orders.get(orderId);
     if (!order) {
@@ -98,34 +83,22 @@ export class OrderStorage {
     return updatedOrder;
   }
 
-  /**
-   * Busca um pedido por ID
-   */
   getOrder(orderId: string): LZTOrder | null {
     return this.orders.get(orderId) || null;
   }
 
-  /**
-   * Busca pedidos pendentes de um usuário
-   */
   getPendingOrdersByUser(userId: string): LZTOrder[] {
     return Array.from(this.orders.values()).filter(
       order => order.user_id === userId && order.status === 'pending'
     );
   }
 
-  /**
-   * Busca todos os pedidos pendentes
-   */
   getAllPendingOrders(): LZTOrder[] {
     return Array.from(this.orders.values()).filter(
       order => order.status === 'pending'
     );
   }
 
-  /**
-   * Busca pedidos por status
-   */
   getOrdersByStatus(status: LZTOrder['status']): LZTOrder[] {
     return Array.from(this.orders.values()).filter(
       order => order.status === status

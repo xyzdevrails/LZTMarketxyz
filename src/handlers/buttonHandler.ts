@@ -15,11 +15,7 @@ import { BalanceService } from '../services/balanceService';
 import { createAccountEmbed } from '../utils/embedBuilder';
 import { logger } from '../utils/logger';
 import QRCode from 'qrcode';
-// Navegação de páginas removida
 
-/**
- * Handler para botões interativos
- */
 export async function handleButtonInteraction(
   interaction: ButtonInteraction,
   lztService: LZTService,
@@ -28,7 +24,6 @@ export async function handleButtonInteraction(
 ): Promise<void> {
   const customId = interaction.customId;
 
-  // Ver conta específica
   if (customId.startsWith('view_account_')) {
     const itemId = parseInt(customId.replace('view_account_', ''));
     
@@ -63,12 +58,10 @@ export async function handleButtonInteraction(
     return;
   }
 
-  // Comprar conta
   if (customId.startsWith('buy_account_')) {
     const itemId = parseInt(customId.replace('buy_account_', ''));
 
     try {
-      // Verifica disponibilidade
       const account = await lztService.getAccountDetails(itemId);
 
       if (account.is_purchased) {
@@ -79,7 +72,6 @@ export async function handleButtonInteraction(
         return;
       }
 
-      // Cria pedido pendente
       const order = await purchaseService.createPendingOrder(
         itemId,
         interaction.user,
@@ -87,7 +79,6 @@ export async function handleButtonInteraction(
         account.currency || 'BRL'
       );
 
-      // Cria modal para confirmação de pagamento
       const modal = new ModalBuilder()
         .setCustomId(`confirm_payment_${order.order_id}`)
         .setTitle('Confirmar Pagamento');
@@ -113,15 +104,10 @@ export async function handleButtonInteraction(
     return;
   }
 
-  // Navegação de páginas removida - não há mais paginação
-
-  // Confirmação de pagamento (via modal submit)
   if (customId.startsWith('confirm_payment_')) {
-    // Este será tratado no modalHandler
     return;
   }
 
-  // Confirma adição de saldo via PIX
   if (customId.startsWith('confirm_add_balance_')) {
     if (!balanceService) {
       await interaction.reply({
@@ -132,7 +118,6 @@ export async function handleButtonInteraction(
       return;
     }
 
-    // Extrai dados do customId: confirm_add_balance_${userId}_${valor}_${confirmationId}
     const parts = customId.split('_');
     if (parts.length < 6) {
       await interaction.reply({
@@ -145,7 +130,6 @@ export async function handleButtonInteraction(
     const userId = parts[3];
     const valor = parseFloat(parts[4]);
 
-    // Verifica se é o usuário correto
     if (interaction.user.id !== userId) {
       await interaction.reply({
         content: '❌ Você não pode confirmar esta transação.',
@@ -157,7 +141,6 @@ export async function handleButtonInteraction(
     await interaction.deferUpdate();
 
     try {
-      // Cria transação PIX
       const result = await balanceService.createPixTransaction(userId, valor);
 
       if (!result.success || !result.qrCode || !result.transactionId) {
@@ -168,7 +151,6 @@ export async function handleButtonInteraction(
         return;
       }
 
-      // Gera imagem do QR Code
       let qrCodeImage: Buffer | null = null;
       try {
         qrCodeImage = await QRCode.toBuffer(result.qrCode, {
@@ -183,13 +165,11 @@ export async function handleButtonInteraction(
         logger.warn('Erro ao gerar imagem do QR Code, usando texto', qrError);
       }
 
-      // Verifica se está em sandbox
       const isSandbox = process.env.EFI_SANDBOX === 'true';
       
-      // Cria embed com informações
       const embed = new EmbedBuilder()
         .setTitle('💰 Adicionar Saldo via PIX')
-        .setColor(isSandbox ? 0xffaa00 : 0x00ff00) // Laranja para sandbox, verde para produção
+        .setColor(isSandbox ? 0xffaa00 : 0x00ff00)
         .setDescription(
           (isSandbox 
             ? `⚠️ **AMBIENTE DE TESTES (SANDBOX)**\n` +
@@ -207,13 +187,11 @@ export async function handleButtonInteraction(
         )
         .setTimestamp();
 
-      // Prepara resposta com QR Code
       const responseData: any = {
         embeds: [embed],
-        components: [], // Remove os botões após confirmação
+        components: [],
       };
 
-      // Se conseguiu gerar imagem do QR Code, anexa
       if (qrCodeImage) {
         const attachment = new AttachmentBuilder(qrCodeImage, {
           name: 'qrcode.png',
@@ -222,7 +200,6 @@ export async function handleButtonInteraction(
         embed.setImage('attachment://qrcode.png');
         responseData.files = [attachment];
       } else {
-        // Se não conseguiu gerar imagem, mostra QR Code como texto
         embed.addFields({
           name: 'QR Code (texto)',
           value: `\`\`\`\n${result.qrCode.substring(0, 200)}...\`\`\``,
@@ -235,7 +212,6 @@ export async function handleButtonInteraction(
     } catch (error: any) {
       logger.error('Erro ao criar transação PIX após confirmação', error);
       
-      // Verifica se é erro de certificado
       if (error.message?.includes('Certificado não encontrado') || error.message?.includes('.p12')) {
         await interaction.editReply({
           content: `❌ **Certificado não configurado**\n\n` +
@@ -257,7 +233,6 @@ export async function handleButtonInteraction(
     return;
   }
 
-  // Cancela adição de saldo
   if (customId.startsWith('cancel_add_balance_')) {
     await interaction.deferUpdate();
     

@@ -11,7 +11,6 @@ async function testSimple() {
   logger.info('Testando autenticação básica...');
 
   try {
-    // Testa endpoint de perfil (mais básico)
     const response = await axios.get(`${baseURL}/user`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -31,7 +30,6 @@ async function testSimple() {
     }
   }
 
-  // Agora tenta buscar categorias
   logger.info('\nTestando endpoint de categorias...');
   try {
     const categoriesResponse = await axios.get(`${baseURL}/categories`, {

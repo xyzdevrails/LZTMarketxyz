@@ -1,7 +1,3 @@
-/**
- * Logger simples para o bot
- */
-
 export enum LogLevel {
   DEBUG = 'DEBUG',
   INFO = 'INFO',

@@ -19,9 +19,6 @@ export interface PixTransaction {
   efi_location_id?: string;
 }
 
-/**
- * Sistema de storage de transações PIX usando JSON file
- */
 export class PixTransactionsStorage {
   private transactions: Map<string, PixTransaction> = new Map();
 
@@ -29,9 +26,6 @@ export class PixTransactionsStorage {
     this.loadTransactions();
   }
 
-  /**
-   * Carrega transações do arquivo JSON
-   */
   private async loadTransactions(): Promise<void> {
     try {
       const data = await fs.readFile(PIX_TRANSACTIONS_FILE, 'utf-8');
@@ -45,7 +39,7 @@ export class PixTransactionsStorage {
       logger.info(`Carregadas ${this.transactions.size} transações PIX`);
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        // Arquivo não existe ainda, criar vazio
+        
         await this.saveTransactions();
         logger.info('Arquivo de transações PIX criado');
       } else {
@@ -54,9 +48,6 @@ export class PixTransactionsStorage {
     }
   }
 
-  /**
-   * Salva transações no arquivo JSON
-   */
   private async saveTransactions(): Promise<void> {
     try {
       const transactionsArray = Array.from(this.transactions.values());
@@ -67,9 +58,6 @@ export class PixTransactionsStorage {
     }
   }
 
-  /**
-   * Cria uma nova transação PIX
-   */
   async createTransaction(transaction: Omit<PixTransaction, 'created_at'>): Promise<PixTransaction> {
     const newTransaction: PixTransaction = {
       ...transaction,
@@ -83,16 +71,10 @@ export class PixTransactionsStorage {
     return newTransaction;
   }
 
-  /**
-   * Obtém uma transação por ID
-   */
   getTransaction(transactionId: string): PixTransaction | null {
     return this.transactions.get(transactionId) || null;
   }
 
-  /**
-   * Atualiza status de uma transação
-   */
   async updateTransactionStatus(
     transactionId: string,
     status: PixTransaction['status'],
@@ -120,36 +102,24 @@ export class PixTransactionsStorage {
     return updatedTransaction;
   }
 
-  /**
-   * Busca transações pendentes de um usuário
-   */
   getPendingTransactionsByUser(userId: string): PixTransaction[] {
     return Array.from(this.transactions.values()).filter(
       transaction => transaction.user_id === userId && transaction.status === 'pending'
     );
   }
 
-  /**
-   * Busca transação por txid da EfiBank
-   */
   getTransactionByEfiTxid(txid: string): PixTransaction | null {
     return Array.from(this.transactions.values()).find(
       transaction => transaction.efi_txid === txid
     ) || null;
   }
 
-  /**
-   * Busca transação por location ID da EfiBank
-   */
   getTransactionByLocationId(locationId: string): PixTransaction | null {
     return Array.from(this.transactions.values()).find(
       transaction => transaction.efi_location_id === locationId
     ) || null;
   }
 
-  /**
-   * Obtém todas as transações (para uso administrativo)
-   */
   getAllTransactions(): PixTransaction[] {
     return Array.from(this.transactions.values());
   }

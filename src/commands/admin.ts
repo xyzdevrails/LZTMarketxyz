@@ -12,7 +12,7 @@ export const data = new SlashCommandBuilder()
   .setName('admin')
   .setDescription('Comandos administrativos do bot')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-  // Grupo: Gerenciamento de Compras
+  
   .addSubcommand(subcommand =>
     subcommand
       .setName('finalizar-compra')
@@ -29,7 +29,7 @@ export const data = new SlashCommandBuilder()
       .setName('compras-pendentes')
       .setDescription('Lista todas as compras de contas pendentes')
   )
-  // Grupo: Gerenciamento de Saldo/PIX
+  
   .addSubcommand(subcommand =>
     subcommand
       .setName('historico-pix')
@@ -91,7 +91,6 @@ export async function execute(
         return;
       }
 
-      // Envia DM ao cliente com os dados da conta
       if (result.accountData && result.order) {
         const user = await interaction.client.users.fetch(result.order.user_id);
 
@@ -173,8 +172,7 @@ export async function execute(
 
     try {
       const statusFilter = interaction.options.getString('status') || 'all';
-      
-      // Obtém todas as transações do storage
+
       const allTransactions = pixTransactionsStorage.getAllTransactions();
       
       let transactions = allTransactions;
@@ -192,12 +190,10 @@ export async function execute(
         return;
       }
 
-      // Ordena por data (mais recente primeiro)
       transactions.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
-      // Limita a 10 transações para não exceder limite do embed
       const transactionsToShow = transactions.slice(0, 10);
 
       const embed = new EmbedBuilder()
@@ -242,8 +238,7 @@ export async function execute(
 
     try {
       const transactionId = interaction.options.getString('transaction_id', true);
-      
-      // Busca a transação específica
+
       const transaction = pixTransactionsStorage.getTransaction(transactionId);
 
       if (!transaction) {
@@ -255,13 +250,11 @@ export async function execute(
         return;
       }
 
-      // Formata data
       const createdDate = new Date(transaction.created_at).toLocaleString('pt-BR');
       const paidDate = transaction.paid_at 
         ? new Date(transaction.paid_at).toLocaleString('pt-BR')
         : 'N/A';
 
-      // Emoji de status
       const statusEmoji: Record<string, string> = {
         'pending': '⏳',
         'paid': '✅',
@@ -317,7 +310,6 @@ export async function execute(
         )
         .setTimestamp();
 
-      // Adiciona informações da EfiBank se disponíveis
       if (transaction.efi_txid) {
         embed.addFields({
           name: '🏦 EfiBank TXID',
@@ -369,7 +361,6 @@ export async function execute(
         return;
       }
 
-      // Busca o usuário para mencionar
       const user = await interaction.client.users.fetch(result.userId!);
 
       await interaction.editReply({
@@ -381,7 +372,6 @@ export async function execute(
           `💰 O saldo foi adicionado à conta do usuário.`,
       });
 
-      // Envia DM ao usuário confirmando o pagamento
       try {
         await user.send(
           `✅ **Pagamento PIX Confirmado!**\n\n` +
@@ -392,7 +382,7 @@ export async function execute(
         );
       } catch (dmError) {
         logger.warn('Não foi possível enviar DM ao usuário', dmError);
-        // Não é crítico, continua normalmente
+        
       }
 
     } catch (error: any) {

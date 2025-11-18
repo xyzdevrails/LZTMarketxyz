@@ -36,22 +36,18 @@ export const data = new SlashCommandBuilder()
       .setMinValue(0)
   );
 
-/**
- * Renderiza contas individuais - uma mensagem por conta
- */
 async function renderAccountsList(
   lztService: LZTService,
   filters: LZTSearchFilters,
   interactionOrMessage: ChatInputCommandInteraction | Message
 ): Promise<void> {
-  // Obtém o canal para enviar mensagens
+  
   const channel = interactionOrMessage.channel;
   
   if (!channel) {
     throw new Error('Canal não disponível');
   }
-  
-  // Verifica se o canal permite envio de mensagens
+
   if (!('send' in channel)) {
     throw new Error('Canal não permite envio de mensagens');
   }
@@ -71,13 +67,11 @@ async function renderAccountsList(
       return;
     }
 
-    // Quantidade de contas a mostrar (padrão: 10, máximo: 20)
     const quantidade = filters.per_page || 10;
     const accountsToShow = response.items.slice(0, Math.min(quantidade, 20));
     
     logger.info(`Preparando para enviar ${accountsToShow.length} conta(s)...`);
 
-    // Envia mensagem inicial informando que está carregando
     if ('editReply' in interactionOrMessage) {
       await interactionOrMessage.editReply({
         content: `📦 Carregando ${accountsToShow.length} conta(s)...`,
@@ -93,16 +87,14 @@ async function renderAccountsList(
       logger.info(`Processando conta ${i + 1}/${accountsToShow.length}: ${account.item_id}`);
       
       try {
-        // Cria embed individual para cada conta
+        
         logger.info(`Criando embed para conta ${account.item_id}...`);
         const embed = createAccountEmbed(account);
-        
-        // Adiciona código de identificação no footer
+
         embed.setFooter({
           text: `Código de Identificação: HYPE_${account.item_id.toString().padStart(6, '0')}`,
         });
 
-        // Cria botões de ação para esta conta
         logger.info(`Criando botões para conta ${account.item_id}...`);
         const actionRow = new ActionRowBuilder<ButtonBuilder>();
         actionRow.addComponents(
@@ -121,7 +113,6 @@ async function renderAccountsList(
             .setStyle(ButtonStyle.Secondary)
         );
 
-        // Envia mensagem individual para cada conta
         logger.info(`Enviando mensagem para conta ${account.item_id}...`);
         await channel.send({
           embeds: [embed],
@@ -129,21 +120,19 @@ async function renderAccountsList(
         });
         logger.info(`✅ Conta ${account.item_id} enviada com sucesso`);
 
-        // Rate limit: espera 200ms entre mensagens para evitar spam
         if (i < accountsToShow.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 200));
         }
       } catch (accountError: any) {
         logger.error(`Erro ao processar conta ${account.item_id}:`, accountError);
         logger.error('Stack:', accountError?.stack);
-        // Continua com a próxima conta mesmo se uma falhar
+        
         continue;
       }
     }
     
     logger.info('Todas as contas processadas');
 
-    // Atualiza mensagem inicial informando conclusão
     const updateContent = `✅ ${accountsToShow.length} conta(s) listada(s) com sucesso!`;
     
     if ('editReply' in interactionOrMessage) {
@@ -217,7 +206,7 @@ export async function execute(
 
   const filters: LZTSearchFilters = {
     page: 1,
-    per_page: Math.min(quantidade, 20), // Máximo 20 contas
+    per_page: Math.min(quantidade, 20), 
     order_by: 'price_to_up',
   };
 
@@ -231,6 +220,4 @@ export async function execute(
 
   await renderAccountsList(lztService, filters, interaction);
 }
-
-// Função de navegação removida - não há mais paginação
 

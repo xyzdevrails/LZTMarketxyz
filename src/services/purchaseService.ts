@@ -5,15 +5,9 @@ import { logger } from '../utils/logger';
 import { LZTAccount, LZTOrder } from '../types/lzt';
 import { v4 as uuidv4 } from 'uuid';
 
-/**
- * Serviço de compra de contas
- */
 export class PurchaseService {
   constructor(private lztService: LZTService) {}
 
-  /**
-   * Cria um pedido pendente
-   */
   async createPendingOrder(
     itemId: number,
     user: User,
@@ -37,9 +31,6 @@ export class PurchaseService {
     return order;
   }
 
-  /**
-   * Confirma pagamento e executa a compra
-   */
   async confirmPurchase(orderId: string): Promise<{
     success: boolean;
     order?: LZTOrder;
@@ -63,10 +54,9 @@ export class PurchaseService {
     }
 
     try {
-      // Atualiza status para confirmado
+      
       await orderStorage.updateOrderStatus(orderId, 'confirmed');
 
-      // Verifica disponibilidade da conta
       const checkResult = await this.lztService.checkAccount(order.item_id);
 
       if (!checkResult.available) {
@@ -77,13 +67,10 @@ export class PurchaseService {
         };
       }
 
-      // Executa a compra
       const purchaseResult = await this.lztService.fastBuyAccount(order.item_id, order.price);
 
-      // Obtém detalhes completos da conta (incluindo credenciais)
       const accountDetails = await this.lztService.getAccountDetails(order.item_id);
 
-      // Marca pedido como concluído
       await orderStorage.updateOrderStatus(orderId, 'completed');
 
       logger.info(`Compra concluída: ${orderId}`);
@@ -105,9 +92,6 @@ export class PurchaseService {
     }
   }
 
-  /**
-   * Cancela um pedido
-   */
   async cancelOrder(orderId: string): Promise<boolean> {
     const order = orderStorage.getOrder(orderId);
     
@@ -121,9 +105,6 @@ export class PurchaseService {
     return true;
   }
 
-  /**
-   * Busca pedidos pendentes de um usuário
-   */
   getPendingOrdersByUser(userId: string): LZTOrder[] {
     return orderStorage.getPendingOrdersByUser(userId);
   }

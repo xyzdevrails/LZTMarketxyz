@@ -10,9 +10,6 @@ import {
   LZTResponse,
 } from '../types/lzt';
 
-/**
- * Cliente para a API do LZT Market
- */
 export class LZTService {
   private client: AxiosInstance;
   private baseURL: string;
@@ -24,7 +21,7 @@ export class LZTService {
 
     this.client = axios.create({
       baseURL: this.baseURL,
-      timeout: 300000, // 300 segundos (5 minutos)
+      timeout: 300000, 
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -32,9 +29,6 @@ export class LZTService {
     });
   }
 
-  /**
-   * Faz uma requisição com rate limiting
-   */
   private async request<T>(config: AxiosRequestConfig): Promise<LZTResponse<T>> {
     try {
       const response = await lztRateLimiter.schedule(() => this.client.request<T>(config));
@@ -48,17 +42,11 @@ export class LZTService {
     }
   }
 
-  /**
-   * Lista contas de Valorant disponíveis
-   * Endpoint: GET /riot (categoria Riot/Valorant)
-   * Documentação: https://lzt-market.readme.io/reference/categoryriot
-   */
   async listValorantAccounts(filters?: LZTSearchFilters): Promise<LZTSearchResponse> {
     logger.info('Buscando contas de Valorant', filters);
 
     const params: Record<string, any> = {};
 
-    // Mapeia parâmetros para o formato da API
     if (filters?.price_min) params.pmin = filters.price_min;
     if (filters?.price_max) params.pmax = filters.price_max;
     if (filters?.page) params.page = filters.page;
@@ -68,7 +56,6 @@ export class LZTService {
     if (filters?.rmin) params.rmin = filters.rmin;
     if (filters?.rmax) params.rmax = filters.rmax;
 
-    // Endpoint correto: /riot (categoria Riot/Valorant)
     const response = await this.request<LZTSearchResponse>({
       method: 'GET',
       url: '/riot',
@@ -76,8 +63,7 @@ export class LZTService {
     });
 
     const result = response.body;
-    
-    // Adiciona compatibilidade com pagination para código existente
+
     if (result && !result.pagination) {
       result.pagination = {
         current_page: result.page || 1,
@@ -90,9 +76,6 @@ export class LZTService {
     return result;
   }
 
-  /**
-   * Obtém detalhes completos de uma conta
-   */
   async getAccountDetails(itemId: number): Promise<LZTAccount> {
     logger.info(`Buscando detalhes da conta ${itemId}`);
 
@@ -104,9 +87,6 @@ export class LZTService {
     return response.body;
   }
 
-  /**
-   * Busca múltiplas contas de uma vez (bulk)
-   */
   async bulkGetAccounts(itemIds: number[]): Promise<LZTAccount[]> {
     logger.info(`Buscando ${itemIds.length} contas em bulk`);
 
@@ -121,9 +101,6 @@ export class LZTService {
     return response.body.items || [];
   }
 
-  /**
-   * Verifica se uma conta está disponível para compra
-   */
   async checkAccount(itemId: number): Promise<{ available: boolean; message?: string }> {
     logger.info(`Verificando disponibilidade da conta ${itemId}`);
 
@@ -142,9 +119,6 @@ export class LZTService {
     }
   }
 
-  /**
-   * Compra rápida de uma conta
-   */
   async fastBuyAccount(itemId: number, price?: number): Promise<LZTPurchaseResponse> {
     logger.info(`Comprando conta ${itemId}${price ? ` por ${price}` : ''}`);
 
@@ -162,9 +136,6 @@ export class LZTService {
     return response.body;
   }
 
-  /**
-   * Confirma compra de uma conta (após check)
-   */
   async confirmBuy(itemId: number, price?: number): Promise<LZTPurchaseResponse> {
     logger.info(`Confirmando compra da conta ${itemId}${price ? ` por ${price}` : ''}`);
 

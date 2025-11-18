@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 import { LZTService } from './services/lztService';
 import { logger } from './utils/logger';
 
-// Carrega variáveis de ambiente
 dotenv.config();
 
 async function testAPI() {
@@ -19,11 +18,11 @@ async function testAPI() {
   logger.info('Testando conexão com a API LZT Market...');
 
   try {
-    // Testa buscar contas de Valorant
+    
     logger.info('Buscando contas de Valorant...');
     const response = await lztService.listValorantAccounts({
       per_page: 5,
-      order_by: 'price_to_up', // Ordenar do mais barato para o mais caro
+      order_by: 'price_to_up', 
     });
 
     logger.info(`✅ Sucesso! Encontradas ${response.items.length} contas`);

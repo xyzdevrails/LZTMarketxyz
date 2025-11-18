@@ -19,9 +19,6 @@ export interface Transaction {
   created_at: string;
 }
 
-/**
- * Sistema de storage de saldos de usuários usando JSON file
- */
 export class UserBalancesStorage {
   private balances: Map<string, UserBalance> = new Map();
 
@@ -29,9 +26,6 @@ export class UserBalancesStorage {
     this.loadBalances();
   }
 
-  /**
-   * Carrega saldos do arquivo JSON
-   */
   private async loadBalances(): Promise<void> {
     try {
       const data = await fs.readFile(BALANCES_FILE, 'utf-8');
@@ -45,7 +39,7 @@ export class UserBalancesStorage {
       logger.info(`Carregados ${this.balances.size} saldos de usuários`);
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        // Arquivo não existe ainda, criar vazio
+        
         await this.saveBalances();
         logger.info('Arquivo de saldos criado');
       } else {
@@ -54,9 +48,6 @@ export class UserBalancesStorage {
     }
   }
 
-  /**
-   * Salva saldos no arquivo JSON
-   */
   private async saveBalances(): Promise<void> {
     try {
       const balancesArray = Array.from(this.balances.values());
@@ -67,9 +58,6 @@ export class UserBalancesStorage {
     }
   }
 
-  /**
-   * Obtém ou cria saldo de um usuário
-   */
   async getOrCreateBalance(userId: string): Promise<UserBalance> {
     let balance = this.balances.get(userId);
     
@@ -87,17 +75,11 @@ export class UserBalancesStorage {
     return balance;
   }
 
-  /**
-   * Obtém saldo de um usuário
-   */
   getBalance(userId: string): number {
     const balance = this.balances.get(userId);
     return balance?.balance || 0;
   }
 
-  /**
-   * Adiciona saldo a um usuário
-   */
   async addBalance(
     userId: string,
     amount: number,
@@ -123,9 +105,6 @@ export class UserBalancesStorage {
     return balance;
   }
 
-  /**
-   * Debita saldo de um usuário
-   */
   async debitBalance(
     userId: string,
     amount: number,
@@ -162,9 +141,6 @@ export class UserBalancesStorage {
     };
   }
 
-  /**
-   * Reembolsa saldo (adiciona de volta)
-   */
   async refundBalance(
     userId: string,
     amount: number,
@@ -174,9 +150,6 @@ export class UserBalancesStorage {
     return await this.addBalance(userId, amount, transactionId, description);
   }
 
-  /**
-   * Obtém histórico de transações de um usuário
-   */
   getTransactions(userId: string, limit: number = 10): Transaction[] {
     const balance = this.balances.get(userId);
     if (!balance) return [];

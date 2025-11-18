@@ -1,16 +1,8 @@
-/**
- * Script para testar webhook localmente
- * 
- * Uso:
- *   node scripts/test-webhook.js <txid> [valor]
- * 
- * Exemplo:
- *   node scripts/test-webhook.js pix_827292b4-3d7e-42e8-9387-edcc506aca90 10.00
- */
+
 
 const axios = require('axios');
 
-const WEBHOOK_URL = process.env.WEBHOOK_URL || 'http://localhost:3000/webhook/pix';
+const WEBHOOK_URL = process.env.WEBHOOK_URL || 'http:
 const TXID = process.argv[2];
 const VALOR = process.argv[3] || '10.00';
 

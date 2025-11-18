@@ -12,20 +12,16 @@ import * as adicionarsaldoCommand from './commands/adicionarsaldo';
 import * as meusaldoCommand from './commands/meusaldo';
 import { WebhookServer } from './server/webhookServer';
 
-// Tipo para comandos
 interface Command {
   data: SlashCommandBuilder;
   execute: (interaction: ChatInputCommandInteraction, ...args: any[]) => Promise<void>;
 }
 
-// Carrega variáveis de ambiente
 dotenv.config();
 
-// Railway usa PORT, mas podemos usar WEBHOOK_PORT como fallback
 const WEBHOOK_PORT = parseInt(process.env.PORT || process.env.WEBHOOK_PORT || '3000', 10);
 const WEBHOOK_ENABLED = process.env.WEBHOOK_ENABLED === 'true';
 
-// Debug: Verifica variáveis importantes (remover depois)
 logger.info(`[DEBUG] Variáveis de ambiente:`);
 logger.info(`[DEBUG]   EFI_CLIENT_ID: ${process.env.EFI_CLIENT_ID ? 'CONFIGURADO' : 'NÃO CONFIGURADO'}`);
 logger.info(`[DEBUG]   EFI_CLIENT_SECRET: ${process.env.EFI_CLIENT_SECRET ? 'CONFIGURADO' : 'NÃO CONFIGURADO'}`);
@@ -34,7 +30,6 @@ logger.info(`[DEBUG]   PORT (Railway): ${process.env.PORT || 'não configurado'}
 logger.info(`[DEBUG]   WEBHOOK_PORT: ${process.env.WEBHOOK_PORT || 'não configurado'}`);
 logger.info(`[DEBUG]   Porta do webhook: ${WEBHOOK_PORT}`);
 
-// Validação de variáveis obrigatórias
 if (!process.env.DISCORD_BOT_TOKEN) {
   logger.error('DISCORD_BOT_TOKEN não encontrado no .env');
   process.exit(1);
@@ -45,7 +40,6 @@ if (!process.env.LZT_API_TOKEN) {
   process.exit(1);
 }
 
-// Inicializa serviços
 const lztService = new LZTService(
   process.env.LZT_API_TOKEN,
   process.env.LZT_API_BASE_URL || 'https://prod-api.lzt.market'
@@ -53,11 +47,9 @@ const lztService = new LZTService(
 
 const purchaseService = new PurchaseService(lztService);
 
-// Inicializa serviços EfiBank (opcional - só se configurado)
 let efiService: any = null;
 let balanceService: any = null;
 
-// Função para inicializar serviços EfiBank
 async function initializeEfiServices() {
   try {
     if (process.env.EFI_CLIENT_ID && process.env.EFI_CLIENT_SECRET) {
@@ -70,10 +62,8 @@ async function initializeEfiServices() {
         logger.info('Serviços EfiBank inicializados com sucesso');
         return true;
       } catch (efiError: any) {
-        // Erro específico do EfiService (ex: certificado não encontrado)
         logger.warn('Erro ao inicializar EfiService:', efiError.message);
         logger.warn('Comando /adicionarsaldo não estará totalmente funcional até configurar o certificado');
-        // Ainda permite registrar o comando, mas ele mostrará erro ao usar
         return false;
       }
     } else {
@@ -87,7 +77,6 @@ async function initializeEfiServices() {
   }
 }
 
-// Cria cliente Discord
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -97,43 +86,32 @@ const client = new Client({
   ],
 });
 
-// Coleção de comandos
 const commands = new Collection<string, Command>();
 
-// Registra comandos
 commands.set(contasCommand.data.name, contasCommand as Command);
 commands.set(contaCommand.data.name, contaCommand as Command);
 commands.set(adminCommand.data.name, adminCommand as Command);
 commands.set(meusaldoCommand.data.name, meusaldoCommand as Command);
 
-// Registra comando de adicionar saldo (será registrado após inicialização dos serviços)
-
-// Inicializa servidor webhook (será inicializado após bot estar pronto)
 let webhookServer: any = null;
 
-// Evento: Bot pronto
 client.once(Events.ClientReady, async (readyClient) => {
   logger.info(`Bot conectado como ${readyClient.user.tag}!`);
   logger.info(`Bot ID: ${readyClient.user.id}`);
   
-  // Inicializa serviços EfiBank se disponíveis
   const efiInitialized = await initializeEfiServices();
   
-  // Inicializa webhook (com ou sem serviços - para testes)
   if (WEBHOOK_ENABLED) {
     try {
-      // Reinicia webhook com serviços se disponíveis
       if (webhookServer) {
         await webhookServer.stop();
       }
       
       if (balanceService) {
-        // Inicia com serviços completos (pode processar pagamentos)
         webhookServer = new WebhookServer(WEBHOOK_PORT, balanceService, readyClient);
         await webhookServer.start();
         logger.info(`[WEBHOOK] Servidor webhook iniciado com serviços na porta ${WEBHOOK_PORT}`);
       } else {
-        // Inicia sem serviços (apenas para receber e logar - útil para testes)
         webhookServer = new WebhookServer(WEBHOOK_PORT);
         await webhookServer.start();
         logger.info(`[WEBHOOK] Servidor webhook iniciado SEM serviços na porta ${WEBHOOK_PORT} (apenas recebe e loga)`);
@@ -147,8 +125,6 @@ client.once(Events.ClientReady, async (readyClient) => {
     logger.info('[WEBHOOK] Servidor webhook desabilitado (WEBHOOK_ENABLED=false ou não configurado)');
   }
   
-  // Registra comandos de saldo se credenciais estiverem configuradas
-  // (mesmo que o certificado não esteja, para mostrar mensagem de erro útil)
   if (process.env.EFI_CLIENT_ID && process.env.EFI_CLIENT_SECRET) {
     commands.set(adicionarsaldoCommand.data.name, adicionarsaldoCommand as Command);
     commands.set(meusaldoCommand.data.name, meusaldoCommand as Command);
@@ -157,13 +133,11 @@ client.once(Events.ClientReady, async (readyClient) => {
     }
   }
   
-  // Registra comandos slash
   try {
     const commandsData = Array.from(commands.values()).map((cmd) => cmd.data);
     logger.info(`[COMANDOS] Registrando ${commandsData.length} comandos:`);
     commandsData.forEach(cmd => {
       logger.info(`[COMANDOS]   - /${cmd.name}: ${cmd.description}`);
-      // Log detalhado dos parâmetros
       if (cmd.options && cmd.options.length > 0) {
         cmd.options.forEach((opt: any) => {
           logger.info(`[COMANDOS]     └─ ${opt.name} (${opt.type === 3 ? 'STRING' : opt.type === 4 ? 'NUMBER' : opt.type}): ${opt.description}`);
@@ -171,11 +145,9 @@ client.once(Events.ClientReady, async (readyClient) => {
       }
     });
     
-    // Tenta registrar comandos globalmente primeiro
     await readyClient.application?.commands.set(commandsData);
     logger.info('[COMANDOS] Comandos slash registrados globalmente!');
     
-    // Também registra em cada servidor (mais rápido para aparecer)
     const guilds = await readyClient.guilds.fetch();
     logger.info(`Registrando comandos em ${guilds.size} servidor(es)...`);
     
@@ -193,7 +165,6 @@ client.once(Events.ClientReady, async (readyClient) => {
       }
     }
     
-    // Lista comandos registrados para debug
     const registeredCommands = await readyClient.application?.commands.fetch();
     logger.info(`Total de comandos registrados globalmente: ${registeredCommands?.size || 0}`);
     registeredCommands?.forEach(cmd => {
@@ -205,11 +176,9 @@ client.once(Events.ClientReady, async (readyClient) => {
   }
 });
 
-// Evento: Interação de comando slash
 client.on(Events.InteractionCreate, async (interaction) => {
   logger.info(`[DEBUG] Interação recebida! Tipo: ${interaction.type}, ID: ${interaction.id}, Usuário: ${interaction.user.tag}, Canal: ${interaction.channel?.id}`);
   
-  // Log adicional para debug
   if (interaction.isChatInputCommand()) {
     logger.info(`[DEBUG] É um comando slash! Nome: ${interaction.commandName}`);
   } else if (interaction.isButton()) {
@@ -233,7 +202,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     try {
-      // Executa comando com serviços necessários
       if (interaction.commandName === 'contas' || interaction.commandName === 'conta') {
         await command.execute(interaction, lztService);
       } else if (interaction.commandName === 'admin') {
@@ -312,7 +280,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// Tratamento de erros não capturados
 process.on('unhandledRejection', (error) => {
   logger.error('Unhandled promise rejection', error);
 });
@@ -322,7 +289,6 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-// Graceful shutdown
 process.on('SIGINT', async () => {
   logger.info('Recebido SIGINT, encerrando...');
   if (webhookServer) {
@@ -341,7 +307,6 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-// Conecta o bot
 client.login(process.env.DISCORD_BOT_TOKEN).catch((error) => {
   logger.error('Erro ao fazer login', error);
   process.exit(1);

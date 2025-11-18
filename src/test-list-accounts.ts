@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 import { LZTService } from './services/lztService';
 import { logger } from './utils/logger';
 
-// Carrega variáveis de ambiente
 dotenv.config();
 
 async function listAccounts() {
@@ -13,7 +12,7 @@ async function listAccounts() {
 
   const lztService = new LZTService(
     process.env.LZT_API_TOKEN,
-    process.env.LZT_API_BASE_URL || 'https://prod-api.lzt.market'
+    process.env.LZT_API_BASE_URL || 'https:
   );
 
   logger.info('🔍 Buscando contas de Valorant...\n');
@@ -21,7 +20,7 @@ async function listAccounts() {
   try {
     const response = await lztService.listValorantAccounts({
       per_page: 10,
-      order_by: 'price_to_up', // Do mais barato para o mais caro
+      order_by: 'price_to_up', 
     });
 
     logger.info(`✅ Encontradas ${response.items.length} contas (de ${response.totalItems} total)\n`);
@@ -55,7 +54,7 @@ async function listAccounts() {
       }
       
       logger.info(`   Estado: ${account.item_state || 'N/A'}`);
-      logger.info(`   Link: https://lzt.market/${account.item_id}`);
+      logger.info(`   Link: https:
       
       if (index < response.items.length - 1) {
         logger.info('   ' + '-'.repeat(76));

@@ -6,7 +6,7 @@ dotenv.config();
 
 async function testEndpoints() {
   const token = process.env.LZT_API_TOKEN;
-  const baseURL = process.env.LZT_API_BASE_URL || 'https://prod-api.lzt.market';
+  const baseURL = process.env.LZT_API_BASE_URL || 'https:
 
   const endpoints = [
     '/market',

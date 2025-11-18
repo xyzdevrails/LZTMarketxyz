@@ -32,10 +32,8 @@ export async function execute(
     const valorString = interaction.options.getString('valor', true);
     const userId = interaction.user.id;
 
-    // Remove espaços e converte vírgula para ponto
     const valorLimpo = valorString.trim().replace(',', '.');
-    
-    // Verifica se tem zeros à esquerda (ex: 0001, 000001, 0000)
+
     if (valorLimpo.match(/^0+[1-9]/) || valorLimpo.match(/^0+0+$/)) {
       await interaction.editReply({
         content: '❌ **Formato inválido!**\n\n' +
@@ -48,8 +46,7 @@ export async function execute(
       });
       return;
     }
-    
-    // Verifica se é um número válido
+
     const valor = parseFloat(valorLimpo);
     
     if (isNaN(valor)) {
@@ -61,8 +58,7 @@ export async function execute(
       });
       return;
     }
-    
-    // Valida valor mínimo
+
     if (valor < 1) {
       await interaction.editReply({
         content: '❌ **Valor mínimo é R$ 1,00**\n\n' +
@@ -71,8 +67,7 @@ export async function execute(
       });
       return;
     }
-    
-    // Valida se o valor é positivo
+
     if (valor <= 0) {
       await interaction.editReply({
         content: '❌ **Valor inválido!**\n\n' +
@@ -82,10 +77,8 @@ export async function execute(
       return;
     }
 
-    // Gera ID único para esta confirmação
     const confirmationId = uuidv4();
-    
-    // Cria embed de confirmação
+
     const confirmEmbed = new EmbedBuilder()
       .setTitle('💰 Confirmar Adição de Saldo')
       .setColor(0xffaa00)
@@ -100,7 +93,6 @@ export async function execute(
       )
       .setTimestamp();
 
-    // Cria botões de confirmação
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(`confirm_add_balance_${userId}_${valor}_${confirmationId}`)

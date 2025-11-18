@@ -6,12 +6,11 @@ dotenv.config();
 
 async function testMarketSearch() {
   const token = process.env.LZT_API_TOKEN;
-  const baseURL = process.env.LZT_API_BASE_URL || 'https://api.lzt.market';
+  const baseURL = process.env.LZT_API_BASE_URL || 'https:
 
-  // Endpoints possíveis para buscar contas no mercado
   const endpoints = [
     { url: '/', params: {} },
-    { url: '/', params: { category_id: 13 } }, // Valorant category ID
+    { url: '/', params: { category_id: 13 } }, 
     { url: '/', params: { game_id: 13 } },
     { url: '/market', params: {} },
     { url: '/market', params: { category_id: 13 } },
@@ -34,8 +33,7 @@ async function testMarketSearch() {
       logger.info(`Status: ${response.status}`);
       const dataStr = JSON.stringify(response.data).substring(0, 1000);
       logger.info(`Resposta: ${dataStr}...`);
-      
-      // Se encontrou items, para aqui
+
       if (response.data?.items && response.data.items.length > 0) {
         logger.info(`\n🎉 Encontrou ${response.data.items.length} conta(s)!`);
         return;

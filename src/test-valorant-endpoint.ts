@@ -7,14 +7,14 @@ dotenv.config();
 async function testValorantEndpoint() {
   const token = process.env.LZT_API_TOKEN;
   const baseURLs = [
-    'https://api.lzt.market',
-    'https://prod-api.lzt.market',
+    'https:
+    'https:
   ];
 
   const endpoints = [
     '/valorant',
     '/market/valorant',
-    '/13', // category ID
+    '/13', 
   ];
 
   for (const baseURL of baseURLs) {
@@ -38,7 +38,7 @@ async function testValorantEndpoint() {
           const dataStr = JSON.stringify(response.data).substring(0, 1000);
           logger.info(`Resposta: ${dataStr}...`);
         }
-        return; // Se funcionou, para aqui
+        return; 
       } catch (error: any) {
         if (error.response) {
           logger.info(`❌ Status: ${error.response.status}`);
