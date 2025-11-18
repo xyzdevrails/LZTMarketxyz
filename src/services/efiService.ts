@@ -142,12 +142,6 @@ export class EfiService {
       
       const valorEmCentavos = Math.round(params.valor * 100);
 
-      // URL do webhook para notificações automáticas
-      const webhookUrl = process.env.WEBHOOK_URL || 
-        (process.env.RAILWAY_PUBLIC_DOMAIN 
-          ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/webhook/pix`
-          : 'https://lztmarketxyz-production.up.railway.app/webhook/pix');
-
       const chargeData: any = {
         calendario: {
           expiracao: 3600, 
@@ -155,16 +149,16 @@ export class EfiService {
         valor: {
           original: valorEmCentavos.toFixed(2),
         },
-        chave: pixKey,
-        // IMPORTANTE: notification_url é o campo correto para webhook na EfiBank
-        notification_url: webhookUrl,
+        chave: pixKey, 
       };
 
       if (params.solicitacaoPagador) {
         chargeData.solicitacaoPagador = params.solicitacaoPagador;
       }
 
-      logger.info(`[EFI] Criando cobrança com webhook URL: ${webhookUrl}`);
+      // NOTA: notification_url não é suportado no payload da cobrança PIX imediata da EfiBank
+      // O webhook precisa ser configurado separadamente via API ou painel
+      // Por enquanto, removemos para evitar erro de "propriedades adicionais não permitidas"
 
       let response;
 
