@@ -130,7 +130,8 @@ export class EfiService {
       
       logger.info(`[EFI] Criando cobrança PIX:`);
       logger.info(`[EFI]   - Ambiente: ${this.sandbox ? 'SANDBOX' : 'PRODUÇÃO'}`);
-      logger.info(`[EFI]   - Valor: R$ ${params.valor} (${Math.round(params.valor * 100)} centavos)`);
+      logger.info(`[EFI]   - Valor: R$ ${params.valor.toFixed(2)}`);
+      logger.info(`[EFI]   - Valor enviado à API: "${params.valor.toFixed(2)}"`);
       logger.info(`[EFI]   - TXID: ${params.txid || 'Será gerado pela EfiBank'}`);
 
       const pixKey = params.chave || process.env.EFI_PIX_KEY;
@@ -142,14 +143,17 @@ export class EfiService {
       
       logger.info(`[EFI]   - Chave PIX: ${pixKey.substring(0, 10)}...${pixKey.substring(pixKey.length - 4)}`);
       
-      const valorEmCentavos = Math.round(params.valor * 100);
+      // IMPORTANTE: A API da EfiBank espera o valor em REAIS, não em centavos!
+      // O campo 'original' deve ser uma string com o valor em reais com 2 casas decimais
+      // Exemplo: R$ 1,00 = "1.00", não "100.00"
+      const valorEmReais = params.valor.toFixed(2);
 
       const chargeData: any = {
         calendario: {
           expiracao: 3600, 
         },
         valor: {
-          original: valorEmCentavos.toFixed(2),
+          original: valorEmReais,
         },
         chave: pixKey, 
       };
