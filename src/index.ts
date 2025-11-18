@@ -189,7 +189,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (interaction.commandName === 'contas' || interaction.commandName === 'conta') {
         await command.execute(interaction, lztService);
       } else if (interaction.commandName === 'admin') {
-        await command.execute(interaction, purchaseService);
+        await command.execute(interaction, purchaseService, balanceService);
       } else if (interaction.commandName === 'adicionarsaldo') {
         if (!balanceService) {
           await interaction.reply({

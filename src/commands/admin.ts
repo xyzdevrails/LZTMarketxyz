@@ -54,11 +54,23 @@ export const data = new SlashCommandBuilder()
           .setDescription('ID da transação (ex: pix_3350c5aa-aaa9-45f2-af3d-7f60c65b9dfd)')
           .setRequired(true)
       )
+  )
+  .addSubcommand(subcommand =>
+    subcommand
+      .setName('confirmar-pagamento-pix')
+      .setDescription('Confirma um pagamento PIX e adiciona saldo ao usuário')
+      .addStringOption(option =>
+        option
+          .setName('transaction_id')
+          .setDescription('ID da transação PIX (ex: pix_827292b4-3d7e-42e8-9387-edcc506aca90)')
+          .setRequired(true)
+      )
   );
 
 export async function execute(
   interaction: ChatInputCommandInteraction,
-  purchaseService: PurchaseService
+  purchaseService: PurchaseService,
+  balanceService?: any
 ): Promise<void> {
   const subcommand = interaction.options.getSubcommand();
 
