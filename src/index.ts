@@ -240,7 +240,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   } else if (interaction.isButton()) {
     try {
-      await handleButtonInteraction(interaction, lztService, purchaseService);
+      await handleButtonInteraction(interaction, lztService, purchaseService, balanceService);
     } catch (error) {
       logger.error('Erro ao processar interação de botão', error);
       

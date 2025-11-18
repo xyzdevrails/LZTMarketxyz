@@ -3,10 +3,14 @@ import {
   SlashCommandBuilder,
   EmbedBuilder,
   AttachmentBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } from 'discord.js';
 import { BalanceService } from '../services/balanceService';
 import { logger } from '../utils/logger';
 import QRCode from 'qrcode';
+import { v4 as uuidv4 } from 'uuid';
 
 export const data = new SlashCommandBuilder()
   .setName('adicionarsaldo')
@@ -78,102 +82,42 @@ export async function execute(
       return;
     }
 
-    // Cria transação PIX
-    let result;
-    try {
-      result = await balanceService.createPixTransaction(userId, valor);
-    } catch (error: any) {
-      logger.error('Erro ao criar transação PIX', error);
-      
-      // Verifica se é erro de certificado
-      if (error.message?.includes('Certificado não encontrado') || error.message?.includes('.p12')) {
-        await interaction.editReply({
-          content: `❌ **Certificado não configurado**\n\n` +
-            `Para usar o comando /adicionarsaldo, é necessário:\n` +
-            `1. Baixar o certificado .p12 da EfiBank\n` +
-            `2. Colocar em \`certs/certificado.p12\`\n` +
-            `3. Configurar no Railway: \`EFI_CERTIFICATE_PATH=./certs/certificado.p12\`\n\n` +
-            `📖 Consulte a documentação da EfiBank para obter o certificado.`,
-        });
-        return;
-      }
-      
-      await interaction.editReply({
-        content: `❌ Erro ao criar transação PIX: ${error.message || 'Erro desconhecido'}`,
-      });
-      return;
-    }
-
-    if (!result.success || !result.qrCode || !result.transactionId) {
-      await interaction.editReply({
-        content: `❌ Erro ao criar transação PIX: ${result.error || 'Erro desconhecido'}`,
-      });
-      return;
-    }
-
-    // Gera imagem do QR Code
-    let qrCodeImage: Buffer | null = null;
-    try {
-      qrCodeImage = await QRCode.toBuffer(result.qrCode, {
-        width: 400,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF',
-        },
-      });
-    } catch (qrError) {
-      logger.warn('Erro ao gerar imagem do QR Code, usando texto', qrError);
-    }
-
-    // Verifica se está em sandbox
-    const isSandbox = process.env.EFI_SANDBOX === 'true';
+    // Gera ID único para esta confirmação
+    const confirmationId = uuidv4();
     
-    // Cria embed com informações
-    const embed = new EmbedBuilder()
-      .setTitle('💰 Adicionar Saldo via PIX')
-      .setColor(isSandbox ? 0xffaa00 : 0x00ff00) // Laranja para sandbox, verde para produção
+    // Cria embed de confirmação
+    const confirmEmbed = new EmbedBuilder()
+      .setTitle('💰 Confirmar Adição de Saldo')
+      .setColor(0xffaa00)
       .setDescription(
-        (isSandbox 
-          ? `⚠️ **AMBIENTE DE TESTES (SANDBOX)**\n` +
-            `Este QR Code é apenas para testes e **NÃO pode ser pago** com dinheiro real.\n` +
-            `Para pagamentos reais, configure o ambiente de PRODUÇÃO.\n\n`
-          : ''
-        ) +
-        `**Valor:** R$ ${valor.toFixed(2)}\n` +
-        `**ID da Transação:** \`${result.transactionId}\`\n` +
-        `**Status:** ⏳ Aguardando pagamento\n\n` +
-        `**Chave PIX:**\n\`\`\`\n${result.pixKey}\`\`\`\n\n` +
-        `📱 Escaneie o QR Code abaixo ou copie a chave PIX para pagar.\n` +
-        `⏰ Esta transação expira em 1 hora.\n\n` +
-        `⚠️ **Importante:** Guarde o ID da transação para referência.`
+        `**Valor a ser adicionado:** R$ ${valor.toFixed(2)}\n\n` +
+        `⚠️ **Confirme se o valor está correto antes de gerar o QR Code PIX.**\n\n` +
+        `Após confirmar, você receberá:\n` +
+        `• QR Code para pagamento\n` +
+        `• Chave PIX para copiar e colar\n` +
+        `• ID da transação para acompanhamento\n\n` +
+        `⏰ O QR Code expira em 1 hora após a geração.`
       )
       .setTimestamp();
 
-    // Prepara resposta com QR Code
-    const responseData: any = {
-      embeds: [embed],
-    };
+    // Cria botões de confirmação
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`confirm_add_balance_${userId}_${valor}_${confirmationId}`)
+        .setLabel('✅ Confirmar')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`cancel_add_balance_${confirmationId}`)
+        .setLabel('❌ Cancelar')
+        .setStyle(ButtonStyle.Danger)
+    );
 
-    // Se conseguiu gerar imagem do QR Code, anexa
-    if (qrCodeImage) {
-      const attachment = new AttachmentBuilder(qrCodeImage, {
-        name: 'qrcode.png',
-        description: 'QR Code para pagamento PIX',
-      });
-      embed.setImage('attachment://qrcode.png');
-      responseData.files = [attachment];
-    } else {
-      // Se não conseguiu gerar imagem, mostra QR Code como texto
-      embed.addFields({
-        name: 'QR Code (texto)',
-        value: `\`\`\`\n${result.qrCode.substring(0, 200)}...\`\`\``,
-      });
-    }
+    await interaction.editReply({
+      embeds: [confirmEmbed],
+      components: [row],
+    });
 
-    await interaction.editReply(responseData);
-
-    logger.info(`Transação PIX criada para ${interaction.user.tag} (${userId}): R$ ${valor.toFixed(2)}`);
+    logger.info(`Confirmação de saldo solicitada por ${interaction.user.tag} (${userId}): R$ ${valor.toFixed(2)}`);
   } catch (error: any) {
     logger.error('Erro ao processar comando /adicionarsaldo', error);
     await interaction.editReply({
