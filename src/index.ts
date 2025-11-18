@@ -101,31 +101,10 @@ commands.set(meusaldoCommand.data.name, meusaldoCommand as Command);
 
 // Registra comando de adicionar saldo (será registrado após inicialização dos serviços)
 
-// Inicializa servidor webhook (se configurado)
+// Inicializa servidor webhook (será inicializado após bot estar pronto)
 let webhookServer: any = null;
 const WEBHOOK_PORT = parseInt(process.env.WEBHOOK_PORT || '3000', 10);
 const WEBHOOK_ENABLED = process.env.WEBHOOK_ENABLED === 'true';
-
-// Função para inicializar webhook
-async function initializeWebhookServer() {
-  if (WEBHOOK_ENABLED) {
-    try {
-      webhookServer = new WebhookServer(WEBHOOK_PORT);
-      await webhookServer.start();
-      logger.info(`[WEBHOOK] Servidor webhook habilitado na porta ${WEBHOOK_PORT}`);
-    } catch (error: any) {
-      logger.error('[WEBHOOK] Erro ao iniciar servidor webhook:', error);
-      logger.warn('[WEBHOOK] Bot continuará sem webhook (confirmação manual necessária)');
-    }
-  } else {
-    logger.info('[WEBHOOK] Servidor webhook desabilitado (WEBHOOK_ENABLED=false ou não configurado)');
-  }
-}
-
-// Inicializa webhook em paralelo
-initializeWebhookServer().catch((error) => {
-  logger.error('[WEBHOOK] Erro fatal ao inicializar webhook:', error);
-});
 
 // Evento: Bot pronto
 client.once(Events.ClientReady, async (readyClient) => {
@@ -134,6 +113,21 @@ client.once(Events.ClientReady, async (readyClient) => {
   
   // Inicializa serviços EfiBank se disponíveis
   const efiInitialized = await initializeEfiServices();
+  
+  // Inicializa webhook com serviços agora que estão disponíveis
+  if (WEBHOOK_ENABLED && balanceService) {
+    try {
+      // Reinicia webhook com serviços corretos
+      if (webhookServer) {
+        await webhookServer.stop();
+      }
+      webhookServer = new WebhookServer(WEBHOOK_PORT, balanceService, readyClient);
+      await webhookServer.start();
+      logger.info(`[WEBHOOK] Servidor webhook reiniciado com serviços na porta ${WEBHOOK_PORT}`);
+    } catch (error: any) {
+      logger.error('[WEBHOOK] Erro ao reiniciar webhook com serviços:', error);
+    }
+  }
   
   // Registra comandos de saldo se credenciais estiverem configuradas
   // (mesmo que o certificado não esteja, para mostrar mensagem de erro útil)

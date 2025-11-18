@@ -1,5 +1,8 @@
 import express, { Request, Response } from 'express';
 import { logger } from '../utils/logger';
+import { WebhookHandler } from '../handlers/webhookHandler';
+import { BalanceService } from '../services/balanceService';
+import { Client } from 'discord.js';
 
 /**
  * Servidor HTTP para receber webhooks da EfiBank
@@ -11,10 +14,24 @@ export class WebhookServer {
   private app: express.Application;
   private port: number;
   private server: any = null;
+  private webhookHandler: WebhookHandler | null = null;
 
-  constructor(port: number = 3000) {
+  constructor(
+    port: number = 3000,
+    balanceService?: BalanceService,
+    discordClient?: Client
+  ) {
     this.app = express();
     this.port = port;
+    
+    // Inicializa handler se serviços estiverem disponíveis
+    if (balanceService && discordClient) {
+      this.webhookHandler = new WebhookHandler(balanceService, discordClient);
+      logger.info('[WEBHOOK] WebhookHandler inicializado com sucesso');
+    } else {
+      logger.warn('[WEBHOOK] WebhookHandler não inicializado (serviços não disponíveis)');
+    }
+    
     this.setupMiddleware();
     this.setupRoutes();
   }
@@ -52,17 +69,47 @@ export class WebhookServer {
         logger.info('[WEBHOOK] IP:', req.ip);
         logger.info('[WEBHOOK] ========================================');
         
-        // Por enquanto, apenas loga e responde 200
-        // TODO: Implementar validação e processamento
-        
-        res.status(200).json({ 
-          received: true,
-          timestamp: new Date().toISOString(),
-          message: 'Webhook recebido com sucesso (processamento será implementado)'
-        });
+        // Se handler estiver disponível, processa o webhook
+        if (this.webhookHandler) {
+          const result = await this.webhookHandler.processPixWebhook(req.body);
+          
+          if (result.success) {
+            logger.info(`[WEBHOOK] Webhook processado: ${result.message}`);
+            res.status(200).json({ 
+              received: true,
+              processed: result.processed || false,
+              timestamp: new Date().toISOString(),
+              message: result.message
+            });
+          } else {
+            logger.error(`[WEBHOOK] Erro ao processar webhook: ${result.message}`);
+            // Ainda responde 200 para não fazer EfiBank reenviar
+            res.status(200).json({ 
+              received: true,
+              processed: false,
+              error: result.message,
+              timestamp: new Date().toISOString()
+            });
+          }
+        } else {
+          // Handler não disponível, apenas loga
+          logger.warn('[WEBHOOK] WebhookHandler não disponível, apenas logando');
+          res.status(200).json({ 
+            received: true,
+            processed: false,
+            timestamp: new Date().toISOString(),
+            message: 'Webhook recebido mas não processado (serviços não disponíveis)'
+          });
+        }
       } catch (error: any) {
         logger.error('[WEBHOOK] Erro ao processar webhook:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        // Responde 200 para não fazer EfiBank reenviar em caso de erro interno
+        res.status(200).json({ 
+          received: true,
+          processed: false,
+          error: 'Internal server error',
+          timestamp: new Date().toISOString()
+        });
       }
     });
 
