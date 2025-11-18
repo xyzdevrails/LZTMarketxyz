@@ -13,6 +13,37 @@ Servidor HTTP básico criado e integrado ao bot Discord.
    - `POST /webhook/pix` - Endpoint para receber webhooks PIX
    - `POST /webhook/test` - Endpoint de teste
 
+---
+
+## ✅ Passo 2: Processamento Automático (CONCLUÍDO)
+
+Handler para processar eventos de pagamento automaticamente.
+
+### O que foi implementado:
+
+1. ✅ `WebhookHandler` criado (`src/handlers/webhookHandler.ts`)
+2. ✅ Extração de txid do payload (suporta múltiplos formatos)
+3. ✅ Identificação de eventos de pagamento confirmado
+4. ✅ Integração com `BalanceService` para confirmar pagamentos
+5. ✅ Envio automático de DM ao usuário quando saldo for adicionado
+6. ✅ Logs detalhados de todo o processo
+
+### Como funciona agora:
+
+1. EfiBank envia webhook para `/webhook/pix`
+2. Bot extrai `txid` do payload
+3. Bot identifica se é pagamento confirmado
+4. Bot confirma pagamento via `BalanceService`
+5. Bot adiciona saldo ao usuário automaticamente
+6. Bot envia DM ao usuário confirmando
+7. Responde 200 OK para EfiBank
+
+### ⚠️ Importante:
+
+- **Webhook agora processa pagamentos automaticamente!**
+- Se webhook não funcionar, ainda pode usar `/admin liberar-saldo` manualmente
+- Webhook responde 200 mesmo em caso de erro (para evitar reenvios)
+
 ### Variáveis de Ambiente Necessárias:
 
 ```env
@@ -59,24 +90,21 @@ WEBHOOK_PORT=3000
 
 ## 📋 Próximos Passos:
 
-### Passo 2: Configurar URL Pública (Railway)
+### Passo 3: Configurar URL Pública (Railway)
 - Expor porta 3000 no Railway
 - Obter URL pública (ex: `https://seu-bot.railway.app/webhook/pix`)
 - Configurar no painel da EfiBank
 
-### Passo 3: Validação de Assinatura
+### Passo 4: Validação de Assinatura (Opcional mas Recomendado)
 - Implementar validação mTLS
 - Verificar assinatura do webhook
 - Rejeitar requisições inválidas
+- **Nota:** Por enquanto funciona sem validação, mas é recomendado para produção
 
-### Passo 4: Processamento de Eventos
-- Processar evento de pagamento confirmado
-- Integrar com BalanceService
-- Adicionar saldo automaticamente
-
-### Passo 5: Notificação ao Usuário
-- Enviar DM quando saldo for adicionado
-- Mostrar valor e novo saldo
+### Passo 5: Testes em Homologação
+- Testar webhook com pagamentos reais em sandbox
+- Verificar se saldo é adicionado corretamente
+- Verificar se DM é enviada ao usuário
 
 ---
 
