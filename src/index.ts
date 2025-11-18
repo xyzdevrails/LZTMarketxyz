@@ -9,6 +9,7 @@ import * as contasCommand from './commands/contas';
 import * as contaCommand from './commands/conta';
 import * as adminCommand from './commands/admin';
 import * as adicionarsaldoCommand from './commands/adicionarsaldo';
+import * as meusaldoCommand from './commands/meusaldo';
 
 // Tipo para comandos
 interface Command {
@@ -89,6 +90,7 @@ const commands = new Collection<string, Command>();
 commands.set(contasCommand.data.name, contasCommand as Command);
 commands.set(contaCommand.data.name, contaCommand as Command);
 commands.set(adminCommand.data.name, adminCommand as Command);
+commands.set(meusaldoCommand.data.name, meusaldoCommand as Command);
 
 // Registra comando de adicionar saldo (será registrado após inicialização dos serviços)
 
@@ -100,12 +102,13 @@ client.once(Events.ClientReady, async (readyClient) => {
   // Inicializa serviços EfiBank se disponíveis
   const efiInitialized = await initializeEfiServices();
   
-  // Registra comando de adicionar saldo se credenciais estiverem configuradas
+  // Registra comandos de saldo se credenciais estiverem configuradas
   // (mesmo que o certificado não esteja, para mostrar mensagem de erro útil)
   if (process.env.EFI_CLIENT_ID && process.env.EFI_CLIENT_SECRET) {
     commands.set(adicionarsaldoCommand.data.name, adicionarsaldoCommand as Command);
+    commands.set(meusaldoCommand.data.name, meusaldoCommand as Command);
     if (!efiInitialized || !balanceService) {
-      logger.warn('Comando /adicionarsaldo registrado, mas não funcionará até configurar o certificado .p12');
+      logger.warn('Comandos de saldo registrados, mas não funcionarão até configurar o certificado .p12');
     }
   }
   
@@ -198,6 +201,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
               '- `EFI_CLIENT_ID`\n' +
               '- `EFI_CLIENT_SECRET`\n' +
               '- `EFI_CERTIFICATE_PATH` (caminho para o arquivo .p12)',
+            ephemeral: true,
+          });
+          return;
+        }
+        await command.execute(interaction, balanceService);
+      } else if (interaction.commandName === 'meusaldo') {
+        if (!balanceService) {
+          await interaction.reply({
+            content: '❌ **Serviço de saldo não está disponível**\n\n' +
+              'Configure as credenciais da EfiBank no Railway.',
             ephemeral: true,
           });
           return;

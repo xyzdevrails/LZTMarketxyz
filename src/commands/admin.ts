@@ -12,26 +12,28 @@ export const data = new SlashCommandBuilder()
   .setName('admin')
   .setDescription('Comandos administrativos do bot')
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+  // Grupo: Gerenciamento de Compras
   .addSubcommand(subcommand =>
     subcommand
-      .setName('confirmar-pagamento')
-      .setDescription('Confirma um pagamento e processa a compra')
+      .setName('finalizar-compra')
+      .setDescription('Finaliza compra e entrega conta Valorant ao cliente')
       .addStringOption(option =>
         option
           .setName('pedido_id')
-          .setDescription('ID do pedido a ser confirmado')
+          .setDescription('ID do pedido a ser finalizado')
           .setRequired(true)
       )
   )
   .addSubcommand(subcommand =>
     subcommand
-      .setName('pedidos-pendentes')
-      .setDescription('Lista todos os pedidos pendentes')
+      .setName('compras-pendentes')
+      .setDescription('Lista todas as compras de contas pendentes')
   )
+  // Grupo: Gerenciamento de Saldo/PIX
   .addSubcommand(subcommand =>
     subcommand
-      .setName('transacoes-pix')
-      .setDescription('Lista transações PIX (pendentes ou todas)')
+      .setName('historico-pix')
+      .setDescription('Lista histórico de transações PIX (pendentes ou todas)')
       .addStringOption(option =>
         option
           .setName('status')
@@ -46,8 +48,8 @@ export const data = new SlashCommandBuilder()
   )
   .addSubcommand(subcommand =>
     subcommand
-      .setName('transacao-pix')
-      .setDescription('Visualiza detalhes de uma transação PIX específica')
+      .setName('detalhes-pix')
+      .setDescription('Visualiza detalhes completos de uma transação PIX específica')
       .addStringOption(option =>
         option
           .setName('transaction_id')
@@ -57,8 +59,8 @@ export const data = new SlashCommandBuilder()
   )
   .addSubcommand(subcommand =>
     subcommand
-      .setName('confirmar-pagamento-pix')
-      .setDescription('Confirma um pagamento PIX e adiciona saldo ao usuário')
+      .setName('liberar-saldo')
+      .setDescription('Confirma pagamento PIX e libera saldo para o usuário')
       .addStringOption(option =>
         option
           .setName('transaction_id')
@@ -74,7 +76,7 @@ export async function execute(
 ): Promise<void> {
   const subcommand = interaction.options.getSubcommand();
 
-  if (subcommand === 'confirmar-pagamento') {
+  if (subcommand === 'finalizar-compra') {
     const orderId = interaction.options.getString('pedido_id', true);
 
     await interaction.deferReply({ ephemeral: true });
@@ -132,7 +134,7 @@ export async function execute(
     return;
   }
 
-  if (subcommand === 'pedidos-pendentes') {
+  if (subcommand === 'compras-pendentes') {
     await interaction.deferReply({ ephemeral: true });
 
     try {
@@ -166,7 +168,7 @@ export async function execute(
     return;
   }
 
-  if (subcommand === 'transacoes-pix') {
+  if (subcommand === 'historico-pix') {
     await interaction.deferReply({ ephemeral: true });
 
     try {
@@ -235,7 +237,7 @@ export async function execute(
     return;
   }
 
-  if (subcommand === 'transacao-pix') {
+  if (subcommand === 'detalhes-pix') {
     await interaction.deferReply({ ephemeral: true });
 
     try {
@@ -344,7 +346,7 @@ export async function execute(
     return;
   }
 
-  if (subcommand === 'confirmar-pagamento-pix') {
+  if (subcommand === 'liberar-saldo') {
     if (!balanceService) {
       await interaction.reply({
         content: '❌ **Serviço de saldo não está disponível**\n\n' +
