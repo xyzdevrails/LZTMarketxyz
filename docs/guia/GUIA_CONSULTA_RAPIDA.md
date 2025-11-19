@@ -368,10 +368,9 @@ Se webhook não estiver funcionando, use:
 ### Arquivos de Documentação do Projeto
 
 - `README.md` - Visão geral do projeto
-- `MELHORIAS_PRODUCAO.md` - Melhorias pendentes
-- `WEBHOOK_SETUP.md` - Guia de setup do webhook
-- `TESTE_POSTMAN.md` - Como testar endpoints
-- `TROUBLESHOOTING_WEBHOOK.md` - Solução de problemas
+- `docs/planejamento/MELHORIAS_PRODUCAO.md` - Melhorias pendentes
+- `docs/guia/EXPLICACAO_SIMPLES.md` - Explicações simples
+- `docs/configuracao/CERTIFICADOS_README.md` - Configuração de certificados
 
 ---
 
