@@ -109,9 +109,9 @@
 
 ## ❌ PENDENTE
 
-### 1. Bug: Status de Transação PIX Não Atualiza Após Pagamento 🔴
+### 1. Bug: Status de Transação PIX Não Atualiza Após Pagamento ✅
 **Prioridade:** 🔴 ALTA (BUG CRÍTICO)  
-**Status:** Bug identificado - não corrigido
+**Status:** ✅ CORRIGIDO (Janeiro 2025)
 
 **Problema:**
 - Após pagamento PIX ser aprovado e saldo creditado com sucesso, o status da transação permanece como `pending` ao invés de `paid`
@@ -127,11 +127,11 @@
 - No método `confirmPixPayment` do `balanceService.ts`, quando a transação é encontrada por `efi_txid`, o `transactionId` usado para atualizar pode estar incorreto ou vazio
 - Linha 108 usa `transactionId` do parâmetro, mas deveria usar `transaction.transaction_id` quando encontrado por `efi_txid`
 
-**Implementação sugerida:**
-- Corrigir `balanceService.confirmPixPayment()` para usar `transaction.transaction_id` ao invés do parâmetro `transactionId` quando a transação foi encontrada por `efi_txid`
-- Garantir que o status seja sempre atualizado corretamente após confirmação de pagamento
-- Adicionar validação para garantir que o status seja atualizado antes de creditar saldo
-- Testar cenário onde webhook encontra transação por `efi_txid`
+**Correção implementada:**
+- ✅ Corrigido `balanceService.confirmPixPayment()` para usar `transaction.transaction_id` ao invés do parâmetro `transactionId`
+- ✅ Garantido que o status seja sempre atualizado corretamente após confirmação de pagamento
+- ✅ Corrigido também o uso de `transaction.transaction_id` ao adicionar saldo e nos logs
+- ✅ Agora funciona corretamente mesmo quando webhook encontra transação por `efi_txid`
 
 ---
 
@@ -321,7 +321,7 @@
 - [x] Validação de expiração de transações ✅
 
 ### 🐛 Bugs Conhecidos
-- [ ] Status de transação PIX não atualiza após pagamento (ALTA)
+- [x] Status de transação PIX não atualiza após pagamento (ALTA) ✅ CORRIGIDO
 
 ### ❌ Pendente
 - [ ] Backup automático configurado
