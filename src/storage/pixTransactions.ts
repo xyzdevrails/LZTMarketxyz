@@ -95,6 +95,10 @@ export class PixTransactionsStorage {
       updatedTransaction.paid_at = new Date().toISOString();
     }
 
+    if (status === 'expired' && !updatedTransaction.expired_at) {
+      updatedTransaction.expired_at = new Date().toISOString();
+    }
+
     this.transactions.set(transactionId, updatedTransaction);
     await this.saveTransactions();
 
@@ -122,6 +126,27 @@ export class PixTransactionsStorage {
 
   getAllTransactions(): PixTransaction[] {
     return Array.from(this.transactions.values());
+  }
+
+  /**
+   * Busca transações pendentes que estão expiradas (criadas há mais de 1 hora)
+   * @param expirationHours Número de horas para considerar expirado (padrão: 1)
+   * @returns Array de transações pendentes expiradas
+   */
+  getExpiredPendingTransactions(expirationHours: number = 1): PixTransaction[] {
+    const now = new Date();
+    const expirationTime = expirationHours * 60 * 60 * 1000; // Converter horas para milissegundos
+
+    return Array.from(this.transactions.values()).filter(transaction => {
+      if (transaction.status !== 'pending') {
+        return false;
+      }
+
+      const createdAt = new Date(transaction.created_at);
+      const timeDiff = now.getTime() - createdAt.getTime();
+
+      return timeDiff > expirationTime;
+    });
   }
 }
 

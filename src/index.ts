@@ -11,6 +11,7 @@ import * as adminCommand from './commands/admin';
 import * as adicionarsaldoCommand from './commands/adicionarsaldo';
 import * as meusaldoCommand from './commands/meusaldo';
 import { WebhookServer } from './server/webhookServer';
+import { ExpirationService } from './services/expirationService';
 
 interface Command {
   data: SlashCommandBuilder;
@@ -94,6 +95,7 @@ commands.set(adminCommand.data.name, adminCommand as Command);
 commands.set(meusaldoCommand.data.name, meusaldoCommand as Command);
 
 let webhookServer: any = null;
+let expirationService: ExpirationService | null = null;
 
 client.once(Events.ClientReady, async (readyClient) => {
   logger.info(`Bot conectado como ${readyClient.user.tag}!`);
@@ -219,6 +221,15 @@ client.once(Events.ClientReady, async (readyClient) => {
     logger.error('Erro ao registrar comandos', error);
     logger.error('Stack:', error.stack);
   }
+
+  // Inicializa serviço de expiração de transações PIX
+  try {
+    expirationService = new ExpirationService(readyClient);
+    expirationService.start();
+    logger.info('[EXPIRATION] Serviço de expiração de transações PIX iniciado');
+  } catch (error: any) {
+    logger.error('[EXPIRATION] Erro ao iniciar serviço de expiração:', error);
+  }
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -336,6 +347,9 @@ process.on('uncaughtException', (error) => {
 
 process.on('SIGINT', async () => {
   logger.info('Recebido SIGINT, encerrando...');
+  if (expirationService) {
+    expirationService.stop();
+  }
   if (webhookServer) {
     await webhookServer.stop();
   }
@@ -345,6 +359,9 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   logger.info('Recebido SIGTERM, encerrando...');
+  if (expirationService) {
+    expirationService.stop();
+  }
   if (webhookServer) {
     await webhookServer.stop();
   }
