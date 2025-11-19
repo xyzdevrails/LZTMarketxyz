@@ -1,6 +1,7 @@
 # 🗺️ Roadmap do Projeto - Bot Discord LZT Market
 
 **Última atualização:** Janeiro 2025  
+**Última revisão:** Janeiro 2025 - Adicionado bug crítico de atualização de status  
 **Status:** ✅ Em Produção
 
 ---
@@ -108,31 +109,55 @@
 
 ## ❌ PENDENTE
 
-### 1. Validação de Expiração de Transações PIX ❌
-**Prioridade:** 🔴 ALTA  
-**Status:** Não implementado
+### 1. Bug: Status de Transação PIX Não Atualiza Após Pagamento 🔴
+**Prioridade:** 🔴 ALTA (BUG CRÍTICO)  
+**Status:** Bug identificado - não corrigido
 
-**Descrição:**
-- Verificar transações PIX pendentes há mais de 1 hora
-- Marcar como expiradas automaticamente
-- Notificar usuário sobre expiração
-- Limpar transações antigas periodicamente
+**Problema:**
+- Após pagamento PIX ser aprovado e saldo creditado com sucesso, o status da transação permanece como `pending` ao invés de `paid`
+- Ao consultar `/admin detalhes-pix`, o status sempre aparece como "Pending" mesmo após pagamento confirmado
+- O saldo é creditado corretamente, mas o status não é atualizado no storage
 
-**Impacto:** Transações podem ficar pendentes indefinidamente.
+**Impacto:** 
+- Dificulta rastreamento de transações pagas
+- Pode causar confusão ao verificar histórico
+- Transações pagas podem ser marcadas como expiradas incorretamente pelo serviço de expiração
+
+**Causa provável:**
+- No método `confirmPixPayment` do `balanceService.ts`, quando a transação é encontrada por `efi_txid`, o `transactionId` usado para atualizar pode estar incorreto ou vazio
+- Linha 108 usa `transactionId` do parâmetro, mas deveria usar `transaction.transaction_id` quando encontrado por `efi_txid`
 
 **Implementação sugerida:**
-- Criar job periódico (cron) que roda a cada 15 minutos
-- Verificar `created_at` de transações pendentes
-- Marcar como `expired` se > 1 hora
-- Enviar DM ao usuário informando expiração
+- Corrigir `balanceService.confirmPixPayment()` para usar `transaction.transaction_id` ao invés do parâmetro `transactionId` quando a transação foi encontrada por `efi_txid`
+- Garantir que o status seja sempre atualizado corretamente após confirmação de pagamento
+- Adicionar validação para garantir que o status seja atualizado antes de creditar saldo
+- Testar cenário onde webhook encontra transação por `efi_txid`
 
 ---
 
-### 2. Comandos de Publicação de Contas ❌
+### 2. Validação de Expiração de Transações PIX ✅
+**Prioridade:** 🔴 ALTA  
+**Status:** ✅ IMPLEMENTADO (Janeiro 2025)
+
+**Descrição:**
+- ✅ Verificar transações PIX pendentes há mais de 1 hora
+- ✅ Marcar como expiradas automaticamente
+- ✅ Notificar usuário sobre expiração
+- ✅ Limpar transações antigas periodicamente
+
+**Implementação:**
+- ✅ Job periódico que roda a cada 15 minutos
+- ✅ Verifica `created_at` de transações pendentes
+- ✅ Marca como `expired` se > 1 hora
+- ✅ Envia DM ao usuário informando expiração
+
+---
+
+### 3. Comandos de Publicação de Contas ❌
 **Prioridade:** 🟡 MÉDIA  
 **Status:** Não implementado
 
-#### 2.1. Comando `/generate` ❌
+#### 3.1. Comando `/generate` ❌
 **Descrição:**
 - Publicar contas automaticamente conforme filtros
 - Filtros: BR, 3+ skins, nível 20+
@@ -146,7 +171,7 @@
 - Verificar se já foi publicada (usar `item_id`)
 - Publicar no canal configurado via webhook ou bot
 
-#### 2.2. Comando `/fa` ❌
+#### 3.2. Comando `/fa` ❌
 **Descrição:**
 - Publicar conta manualmente com preço customizado
 - Validar que preço customizado > preço LZT
@@ -162,7 +187,7 @@
 
 ---
 
-### 3. Sistema de Backup Automático ❌
+### 4. Sistema de Backup Automático ❌
 **Prioridade:** 🟡 MÉDIA  
 **Status:** Não implementado
 
@@ -184,7 +209,7 @@
 
 ---
 
-### 4. Melhorias de Tratamento de Erros ❌
+### 5. Melhorias de Tratamento de Erros ❌
 **Prioridade:** 🟡 MÉDIA  
 **Status:** Básico implementado
 
@@ -202,7 +227,7 @@
 
 ---
 
-### 5. Validação de Saldo Antes de Comprar ❌
+### 6. Validação de Saldo Antes de Comprar ❌
 **Prioridade:** 🟡 MÉDIA  
 **Status:** Não implementado
 
@@ -216,7 +241,7 @@
 
 ---
 
-### 6. Rate Limiting para Comandos ❌
+### 7. Rate Limiting para Comandos ❌
 **Prioridade:** 🟢 BAIXA  
 **Status:** Não implementado
 
@@ -229,7 +254,7 @@
 
 ---
 
-### 7. Comando `/historico` para Usuários ❌
+### 8. Comando `/historico` para Usuários ❌
 **Prioridade:** 🟢 BAIXA  
 **Status:** Não implementado
 
@@ -242,7 +267,7 @@
 
 ---
 
-### 8. Sistema de Estatísticas ❌
+### 9. Sistema de Estatísticas ❌
 **Prioridade:** 🟢 BAIXA  
 **Status:** Não implementado
 
@@ -263,10 +288,9 @@
 3. ⏳ Verificação de saldo antes de comprar
 4. ⏳ Compra automática quando tem saldo
 
-### Semana 3: Expiração de Transações
-1. ⏳ Job periódico para verificar expirações
-2. ⏳ Marcar transações como expiradas
-3. ⏳ Notificar usuários
+### Semana 3: Correção de Bugs Críticos
+1. 🔴 Corrigir bug de atualização de status de transações PIX
+2. ✅ Validação de expiração de transações (CONCLUÍDO)
 
 ### Semana 4: Backup e Monitoramento
 1. ⏳ Sistema de backup automático
@@ -294,7 +318,10 @@
 
 ### ⏳ Em Andamento
 - [ ] Sistema de compra com saldo automático
-- [ ] Validação de expiração de transações
+- [x] Validação de expiração de transações ✅
+
+### 🐛 Bugs Conhecidos
+- [ ] Status de transação PIX não atualiza após pagamento (ALTA)
 
 ### ❌ Pendente
 - [ ] Backup automático configurado

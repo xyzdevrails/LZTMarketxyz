@@ -105,16 +105,16 @@ export class BalanceService {
         };
       }
 
-      await pixTransactionsStorage.updateTransactionStatus(transactionId, 'paid');
+      await pixTransactionsStorage.updateTransactionStatus(transaction.transaction_id, 'paid');
 
       await userBalancesStorage.addBalance(
         transaction.user_id,
         transaction.amount,
-        transactionId,
+        transaction.transaction_id,
         'Adição de saldo via PIX'
       );
 
-      logger.info(`Pagamento PIX confirmado: ${transactionId} - R$ ${transaction.amount.toFixed(2)} para usuário ${transaction.user_id}`);
+      logger.info(`Pagamento PIX confirmado: ${transaction.transaction_id} - R$ ${transaction.amount.toFixed(2)} para usuário ${transaction.user_id}`);
 
       return {
         success: true,
