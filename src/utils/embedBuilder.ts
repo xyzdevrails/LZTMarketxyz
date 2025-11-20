@@ -215,41 +215,57 @@ export async function createAccountEmbeds(
 ): Promise<EmbedBuilder[]> {
   const embeds: EmbedBuilder[] = [];
   
+  // IMPORTANTE: Se account_info não estiver disponível, buscar detalhes completos da conta
+  let accountWithDetails = account;
+  if (!account.account_info && lztService) {
+    try {
+      logger.info(`[DEBUG] account_info não disponível, buscando detalhes completos da conta ${account.item_id}...`);
+      accountWithDetails = await lztService.getAccountDetails(account.item_id);
+      logger.info(`[DEBUG] ✅ Detalhes completos obtidos. account_info existe? ${!!accountWithDetails.account_info}`);
+      logger.info(`[DEBUG] weapon_skins existe? ${!!accountWithDetails.account_info?.weapon_skins}`);
+      logger.info(`[DEBUG] weapon_skins length: ${accountWithDetails.account_info?.weapon_skins?.length || 0}`);
+    } catch (error: any) {
+      logger.warn(`[DEBUG] ⚠️ Erro ao buscar detalhes completos da conta:`, error.message);
+      // Continuar com os dados originais se falhar
+      accountWithDetails = account;
+    }
+  }
+  
   // Embed principal com informações da conta (sempre retornar pelo menos este)
-  const mainEmbed = createAccountEmbed(account);
+  const mainEmbed = createAccountEmbed(accountWithDetails);
   
   // Garantir que o embed principal tenha pelo menos título e descrição
   if (!mainEmbed.data.title) {
-    mainEmbed.setTitle(`🎮 ${account.title || 'Conta Valorant'}`);
+    mainEmbed.setTitle(`🎮 ${accountWithDetails.title || 'Conta Valorant'}`);
   }
   if (!mainEmbed.data.description) {
-    mainEmbed.setDescription(`💰 **Preço: R$ ${account.price.toFixed(2)}**`);
+    mainEmbed.setDescription(`💰 **Preço: R$ ${accountWithDetails.price.toFixed(2)}**`);
   }
   
   embeds.push(mainEmbed);
 
   // Log para debug - verificar estrutura dos dados
-  logger.info(`[DEBUG] Criando embeds para conta ${account.item_id}`);
-  logger.info(`[DEBUG] account.account_info existe? ${!!account.account_info}`);
-  logger.info(`[DEBUG] account.account_info?.weapon_skins existe? ${!!account.account_info?.weapon_skins}`);
-  logger.info(`[DEBUG] account.account_info?.weapon_skins length: ${account.account_info?.weapon_skins?.length || 0}`);
+  logger.info(`[DEBUG] Criando embeds para conta ${accountWithDetails.item_id}`);
+  logger.info(`[DEBUG] account.account_info existe? ${!!accountWithDetails.account_info}`);
+  logger.info(`[DEBUG] account.account_info?.weapon_skins existe? ${!!accountWithDetails.account_info?.weapon_skins}`);
+  logger.info(`[DEBUG] account.account_info?.weapon_skins length: ${accountWithDetails.account_info?.weapon_skins?.length || 0}`);
 
   let skinImageUrl: string | null = null;
 
-  // ESTRATÉGIA 1: Tentar endpoint /image da API LZT (grid único)
-  // NOTA: Este endpoint pode não funcionar para todas as contas ou pode não existir
-  // Por isso, não é crítico se falhar - temos fallbacks nas estratégias 2 e 3
-  if (lztService) {
-    try {
-      logger.info(`[DEBUG] Estratégia 1: Buscando imagem via endpoint /image da LZT`);
-      // Tentar primeiro sem tipo, depois com 'weapons' se necessário
-      let imagesResponse = await lztService.getAccountImages(account.item_id);
+      // ESTRATÉGIA 1: Tentar endpoint /image da API LZT (grid único)
+      // NOTA: Este endpoint pode não funcionar para todas as contas ou pode não existir
+      // Por isso, não é crítico se falhar - temos fallbacks nas estratégias 2 e 3
+      if (lztService) {
+        try {
+          logger.info(`[DEBUG] Estratégia 1: Buscando imagem via endpoint /image da LZT`);
+          // Tentar primeiro sem tipo, depois com 'weapons' se necessário
+          let imagesResponse = await lztService.getAccountImages(accountWithDetails.item_id);
       
-      // Se não retornar nada, tentar com 'weapons'
-      if (!imagesResponse.image && (!imagesResponse.images || imagesResponse.images.length === 0)) {
-        logger.info(`[DEBUG] Tentando novamente com type='weapons'`);
-        imagesResponse = await lztService.getAccountImages(account.item_id, 'weapons');
-      }
+          // Se não retornar nada, tentar com 'weapons'
+          if (!imagesResponse.image && (!imagesResponse.images || imagesResponse.images.length === 0)) {
+            logger.info(`[DEBUG] Tentando novamente com type='weapons'`);
+            imagesResponse = await lztService.getAccountImages(accountWithDetails.item_id, 'weapons');
+          }
       
       if (imagesResponse.image) {
         skinImageUrl = imagesResponse.image;
@@ -271,9 +287,9 @@ export async function createAccountEmbeds(
   }
 
   // ESTRATÉGIA 2: Usar image_url das skins individuais (se disponível)
-  if (!skinImageUrl && account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
+  if (!skinImageUrl && accountWithDetails.account_info?.weapon_skins && accountWithDetails.account_info.weapon_skins.length > 0) {
     logger.info(`[DEBUG] Estratégia 2: Tentando usar image_url das skins individuais`);
-    const firstSkinWithImage = account.account_info.weapon_skins.find(skin => skin.image_url);
+    const firstSkinWithImage = accountWithDetails.account_info.weapon_skins.find(skin => skin.image_url);
     if (firstSkinWithImage?.image_url) {
       skinImageUrl = firstSkinWithImage.image_url;
       logger.info(`[DEBUG] ✅ Imagem encontrada via image_url da primeira skin: ${skinImageUrl.substring(0, 50)}...`);
@@ -282,16 +298,16 @@ export async function createAccountEmbeds(
 
   // ESTRATÉGIA 3: Usar API valorant-api.com para buscar imagens baseadas nos nomes das skins
   if (!skinImageUrl) {
-    if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
+    if (accountWithDetails.account_info?.weapon_skins && accountWithDetails.account_info.weapon_skins.length > 0) {
       try {
         logger.info(`[DEBUG] Estratégia 3: Buscando imagens via API valorant-api.com`);
-        logger.info(`[DEBUG] Total de skins disponíveis: ${account.account_info.weapon_skins.length}`);
-        logger.info(`[DEBUG] Primeiras 3 skins:`, account.account_info.weapon_skins.slice(0, 3).map(s => s.name));
+        logger.info(`[DEBUG] Total de skins disponíveis: ${accountWithDetails.account_info.weapon_skins.length}`);
+        logger.info(`[DEBUG] Primeiras 3 skins:`, accountWithDetails.account_info.weapon_skins.slice(0, 3).map(s => s.name));
         
         const valorantApi = getValorantApiService();
         
         // Tentar buscar imagem da primeira skin mais importante (geralmente a mais rara ou primeira da lista)
-        const skins = account.account_info.weapon_skins;
+        const skins = accountWithDetails.account_info.weapon_skins;
         
         // Ordenar por raridade (se disponível) ou usar a primeira
         const sortedSkins = [...skins].sort((a, b) => {
@@ -340,9 +356,9 @@ export async function createAccountEmbeds(
       }
     } else {
       logger.warn(`[DEBUG] Estratégia 3: Não executada - account_info.weapon_skins não disponível ou vazio`);
-      logger.info(`[DEBUG] account_info existe? ${!!account.account_info}`);
-      logger.info(`[DEBUG] weapon_skins existe? ${!!account.account_info?.weapon_skins}`);
-      logger.info(`[DEBUG] weapon_skins length: ${account.account_info?.weapon_skins?.length || 0}`);
+      logger.info(`[DEBUG] account_info existe? ${!!accountWithDetails.account_info}`);
+      logger.info(`[DEBUG] weapon_skins existe? ${!!accountWithDetails.account_info?.weapon_skins}`);
+      logger.info(`[DEBUG] weapon_skins length: ${accountWithDetails.account_info?.weapon_skins?.length || 0}`);
     }
   }
 
@@ -353,10 +369,10 @@ export async function createAccountEmbeds(
   } else {
     logger.warn(`[DEBUG] ⚠️ Nenhuma imagem de skin encontrada após todas as estratégias`);
     logger.info(`[DEBUG] Estrutura da conta:`, JSON.stringify({
-      item_id: account.item_id,
-      has_account_info: !!account.account_info,
-      account_info_keys: account.account_info ? Object.keys(account.account_info) : [],
-      weapon_skins_count: account.account_info?.weapon_skins?.length || 0,
+      item_id: accountWithDetails.item_id,
+      has_account_info: !!accountWithDetails.account_info,
+      account_info_keys: accountWithDetails.account_info ? Object.keys(accountWithDetails.account_info) : [],
+      weapon_skins_count: accountWithDetails.account_info?.weapon_skins?.length || 0,
     }, null, 2));
   }
 
