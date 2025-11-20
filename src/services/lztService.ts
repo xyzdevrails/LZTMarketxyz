@@ -126,17 +126,77 @@ export class LZTService {
       logger.info(`[DEBUG] Resposta do endpoint /image:`, JSON.stringify(response.body, null, 2));
 
       // Verificar diferentes formatos de resposta possíveis
+      
+      // Se retornar array com string JSON contendo base64
+      if (Array.isArray(response.body) && response.body.length > 0) {
+        try {
+          const firstItem = response.body[0];
+          let parsedItem: any;
+          
+          // Se for string JSON, fazer parse
+          if (typeof firstItem === 'string') {
+            parsedItem = JSON.parse(firstItem);
+          } else {
+            parsedItem = firstItem;
+          }
+          
+          // Verificar se tem base64
+          if (parsedItem.base64) {
+            // Converter Base64 para data URL que o Discord aceita
+            const dataUrl = `data:image/png;base64,${parsedItem.base64}`;
+            logger.info(`[DEBUG] ✅ Imagem Base64 encontrada e convertida para data URL`);
+            return { image: dataUrl };
+          }
+          
+          // Se tiver campo image ou url
+          if (parsedItem.image) {
+            return { image: parsedItem.image };
+          }
+          if (parsedItem.url) {
+            return { image: parsedItem.url };
+          }
+        } catch (parseError: any) {
+          logger.warn(`[DEBUG] Erro ao fazer parse da resposta do array:`, parseError.message);
+        }
+      }
+      
+      // Se retornar string direta (URL ou Base64)
       if (typeof response.body === 'string') {
-        // Se retornar uma string direta (URL)
+        // Verificar se é Base64 (começa com iVBORw0KGgo...)
+        if (response.body.startsWith('iVBORw0KGgo') || response.body.length > 1000) {
+          const dataUrl = `data:image/png;base64,${response.body}`;
+          logger.info(`[DEBUG] ✅ String Base64 detectada e convertida para data URL`);
+          return { image: dataUrl };
+        }
+        // Se for URL direta
         return { image: response.body };
-      } else if (response.body?.image) {
-        // Se retornar objeto com campo 'image'
+      }
+      
+      // Se retornar objeto com campo 'image'
+      if (response.body?.image) {
+        // Verificar se image é Base64
+        if (typeof response.body.image === 'string' && (response.body.image.startsWith('iVBORw0KGgo') || response.body.image.length > 1000)) {
+          const dataUrl = `data:image/png;base64,${response.body.image}`;
+          logger.info(`[DEBUG] ✅ Campo image contém Base64, convertido para data URL`);
+          return { image: dataUrl };
+        }
         return { image: response.body.image };
-      } else if (response.body?.images && Array.isArray(response.body.images)) {
-        // Se retornar array de imagens
+      }
+      
+      // Se retornar objeto com campo 'base64'
+      if (response.body?.base64) {
+        const dataUrl = `data:image/png;base64,${response.body.base64}`;
+        logger.info(`[DEBUG] ✅ Campo base64 encontrado, convertido para data URL`);
+        return { image: dataUrl };
+      }
+      
+      // Se retornar array de imagens
+      if (response.body?.images && Array.isArray(response.body.images)) {
         return { images: response.body.images };
-      } else if (response.body?.url) {
-        // Se retornar objeto com campo 'url'
+      }
+      
+      // Se retornar objeto com campo 'url'
+      if (response.body?.url) {
         return { image: response.body.url };
       }
 

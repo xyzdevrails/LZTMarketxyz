@@ -73,6 +73,9 @@ export async function execute(
       return;
     }
 
+    // Deferir resposta imediatamente para evitar timeout
+    await interaction.deferReply({ ephemeral: true });
+
     try {
       const result = await accountPublisher.start(client, channelId);
 
@@ -94,42 +97,70 @@ export async function execute(
           .setColor(0x00ff00)
           .setTimestamp();
 
-        await interaction.reply({
+        await interaction.editReply({
           embeds: [embed],
-          ephemeral: true,
         });
       } else {
-        await interaction.reply({
+        await interaction.editReply({
           content: `❌ **Erro ao iniciar publicação automática**\n\n${result.error || 'Erro desconhecido'}`,
-          ephemeral: true,
         });
       }
     } catch (error: any) {
       logger.error('Erro ao iniciar publicação automática', error);
-      await interaction.reply({
-        content: `❌ **Erro ao iniciar publicação automática**\n\n${error.message || 'Erro desconhecido'}`,
-        ephemeral: true,
-      });
+      try {
+        await interaction.editReply({
+          content: `❌ **Erro ao iniciar publicação automática**\n\n${error.message || 'Erro desconhecido'}`,
+        });
+      } catch (editError: any) {
+        // Se já foi respondido ou expirado, tentar followUp
+        try {
+          await interaction.followUp({
+            content: `❌ **Erro ao iniciar publicação automática**\n\n${error.message || 'Erro desconhecido'}`,
+            ephemeral: true,
+          });
+        } catch (followUpError) {
+          logger.error('Erro ao enviar mensagem de erro (tanto editReply quanto followUp falharam)', followUpError);
+        }
+      }
     }
   } else if (action === 'stop') {
-    const result = accountPublisher.stop();
+    // Deferir resposta imediatamente para evitar timeout
+    await interaction.deferReply({ ephemeral: true });
 
-    if (result.success) {
-      const embed = new EmbedBuilder()
-        .setTitle('⏹️ Publicação Automática Parada')
-        .setDescription('A publicação automática de contas foi parada com sucesso.')
-        .setColor(0xff9900)
-        .setTimestamp();
+    try {
+      const result = accountPublisher.stop();
 
-      await interaction.reply({
-        embeds: [embed],
-        ephemeral: true,
-      });
-    } else {
-      await interaction.reply({
-        content: `❌ **Erro ao parar publicação automática**\n\n${result.error || 'Erro desconhecido'}`,
-        ephemeral: true,
-      });
+      if (result.success) {
+        const embed = new EmbedBuilder()
+          .setTitle('⏹️ Publicação Automática Parada')
+          .setDescription('A publicação automática de contas foi parada com sucesso.')
+          .setColor(0xff9900)
+          .setTimestamp();
+
+        await interaction.editReply({
+          embeds: [embed],
+        });
+      } else {
+        await interaction.editReply({
+          content: `❌ **Erro ao parar publicação automática**\n\n${result.error || 'Erro desconhecido'}`,
+        });
+      }
+    } catch (error: any) {
+      logger.error('Erro ao parar publicação automática', error);
+      try {
+        await interaction.editReply({
+          content: `❌ **Erro ao parar publicação automática**\n\n${error.message || 'Erro desconhecido'}`,
+        });
+      } catch (editError: any) {
+        try {
+          await interaction.followUp({
+            content: `❌ **Erro ao parar publicação automática**\n\n${error.message || 'Erro desconhecido'}`,
+            ephemeral: true,
+          });
+        } catch (followUpError) {
+          logger.error('Erro ao enviar mensagem de erro (tanto editReply quanto followUp falharam)', followUpError);
+        }
+      }
     }
   } else {
     await interaction.reply({
