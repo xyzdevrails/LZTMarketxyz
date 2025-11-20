@@ -47,6 +47,9 @@ export class LZTService {
 
     const params: Record<string, any> = {};
 
+    // Filtrar apenas contas de Valorant (game_id = 13)
+    params.game_id = filters?.game_id || 13;
+
     if (filters?.price_min) params.pmin = filters.price_min;
     if (filters?.price_max) params.pmax = filters.price_max;
     if (filters?.page) params.page = filters.page;
