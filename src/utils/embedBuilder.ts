@@ -227,37 +227,82 @@ export async function createAccountEmbeds(
   }
 
   // Buscar imagens das skins através do endpoint /image da API LZT
+  // SEMPRE tentar buscar imagens, mesmo se account_info não existir
   let skinImages: string[] = [];
-  if (lztService && account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
+  if (lztService) {
     try {
-      logger.info(`[DEBUG] Buscando imagens das skins para conta ${account.item_id}`);
+      logger.info(`[DEBUG] Buscando imagens das skins para conta ${account.item_id} através do endpoint /image`);
       const imagesResponse = await lztService.getAccountImages(account.item_id, 'skins');
       skinImages = imagesResponse.images || [];
-      logger.info(`[DEBUG] ${skinImages.length} imagem(ns) de skins encontrada(s)`);
+      logger.info(`[DEBUG] ${skinImages.length} imagem(ns) de skins encontrada(s) do endpoint /image`);
+      
+      if (skinImages.length > 0) {
+        logger.info(`[DEBUG] Primeiras 3 URLs de imagens:`, skinImages.slice(0, 3));
+      } else {
+        logger.info(`[DEBUG] Nenhuma imagem retornada do endpoint /image`);
+      }
     } catch (error: any) {
       logger.error(`[DEBUG] Erro ao buscar imagens das skins:`, error);
+      logger.error(`[DEBUG] Detalhes do erro:`, {
+        message: error.message,
+        statusCode: error.statusCode,
+        code: error.code,
+      });
     }
+  } else {
+    logger.info(`[DEBUG] lztService não disponível para buscar imagens`);
   }
 
   // Criar embeds adicionais para skins com imagens (máximo 5 para não exceder limite do Discord)
-  if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
-    const skins = account.account_info.weapon_skins;
-    logger.info(`[DEBUG] Total de skins encontradas: ${skins.length}`);
+  // Se tivermos imagens do endpoint /image, criar embeds mesmo sem weapon_skins na resposta
+  if (skinImages.length > 0) {
+    logger.info(`[DEBUG] Criando ${Math.min(5, skinImages.length)} embed(s) com imagens de skins`);
     
-    // Usar imagens do endpoint /image se disponíveis, senão usar image_url das skins
-    const maxSkinEmbeds = Math.min(5, Math.max(skins.length, skinImages.length));
+    const maxSkinEmbeds = Math.min(5, skinImages.length);
+    
+    for (let i = 0; i < maxSkinEmbeds; i++) {
+      const imageUrl = skinImages[i];
+      if (!imageUrl || imageUrl.trim() === '') continue;
+      
+      try {
+        logger.info(`[DEBUG] Criando embed ${i + 1}/${maxSkinEmbeds} com imagem: ${imageUrl.substring(0, 50)}...`);
+        
+        const skinEmbed = new EmbedBuilder()
+          .setTitle(`🔫 Skin ${i + 1}`)
+          .setImage(imageUrl)
+          .setColor(0x5865F2)
+          .setDescription('Skin de arma da conta');
+        
+        embeds.push(skinEmbed);
+        logger.info(`[DEBUG] Embed de skin ${i + 1} adicionado com sucesso`);
+      } catch (error: any) {
+        logger.error(`Erro ao criar embed para skin ${i + 1}:`, error);
+      }
+    }
+    
+    // Se houver mais imagens além das mostradas, criar um embed informativo
+    if (skinImages.length > maxSkinEmbeds) {
+      const remainingCount = skinImages.length - maxSkinEmbeds;
+      const remainingEmbed = new EmbedBuilder()
+        .setTitle('🔫 Mais Skins')
+        .setDescription(`*Esta conta possui mais ${remainingCount} skin(s) além das mostradas acima.*`)
+        .setColor(0x5865F2);
+      
+      embeds.push(remainingEmbed);
+    }
+  } else if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
+    // Fallback: usar weapon_skins se disponível (caso raro)
+    const skins = account.account_info.weapon_skins;
+    logger.info(`[DEBUG] Total de skins encontradas em weapon_skins: ${skins.length}`);
+    
+    const maxSkinEmbeds = Math.min(5, skins.length);
     
     for (let i = 0; i < maxSkinEmbeds; i++) {
       const skin = skins[i];
       if (!skin) continue;
       
-      // Priorizar imagem do endpoint /image, senão usar image_url da skin
-      const imageUrl = skinImages[i] || skin.image_url;
-      
-      if (!imageUrl || imageUrl.trim() === '') {
-        logger.info(`[DEBUG] Skin "${skin.name}" não tem imagem disponível`);
-        continue;
-      }
+      const imageUrl = skin.image_url;
+      if (!imageUrl || imageUrl.trim() === '') continue;
       
       try {
         logger.info(`[DEBUG] Criando embed para skin "${skin.name}" com imagem: ${imageUrl}`);
@@ -277,40 +322,16 @@ export async function createAccountEmbeds(
         embeds.push(skinEmbed);
         logger.info(`[DEBUG] Embed de skin "${skin.name}" adicionado com sucesso`);
       } catch (error: any) {
-        // Se houver erro ao criar embed da skin, continuar com as próximas
         logger.error(`Erro ao criar embed para skin ${skin.name}:`, error);
       }
     }
-    
-    // Se houver mais skins além das que foram mostradas com imagens, criar um embed final com lista
-    if (skins.length > maxSkinEmbeds) {
-      const remainingSkins = skins.slice(maxSkinEmbeds);
-      const remainingText = remainingSkins
-        .slice(0, 10)
-        .map(skin => {
-          const rarityEmoji = getRarityEmoji(skin.rarity);
-          return `${rarityEmoji} ${skin.name}`;
-        })
-        .join('\n');
-      
-      const remainingCount = skins.length - maxSkinEmbeds;
-      const moreText = remainingCount > 10 ? `\n\n*... e mais ${remainingCount - 10} skin(s)*` : '';
-      
-      if (remainingText.trim() !== '') {
-        const remainingEmbed = new EmbedBuilder()
-          .setTitle('🔫 Outras Skins')
-          .setDescription(remainingText + moreText)
-          .setColor(0x5865F2);
-        
-        embeds.push(remainingEmbed);
-      }
-    }
   } else {
-    logger.info(`[DEBUG] Nenhuma skin encontrada em account.account_info.weapon_skins`);
+    logger.info(`[DEBUG] Nenhuma imagem encontrada do endpoint /image e nenhuma skin em account.account_info.weapon_skins`);
     logger.info(`[DEBUG] Estrutura completa da conta:`, JSON.stringify({
       item_id: account.item_id,
       has_account_info: !!account.account_info,
       account_info_keys: account.account_info ? Object.keys(account.account_info) : [],
+      all_keys: Object.keys(account).slice(0, 10), // Primeiras 10 chaves
     }, null, 2));
   }
 
