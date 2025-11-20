@@ -1,5 +1,6 @@
 import { EmbedBuilder, ColorResolvable } from 'discord.js';
 import { LZTAccount } from '../types/lzt';
+import { logger } from './logger';
 
 const RANK_EMOJIS: Record<string, string> = {
   'Ferro': '⚫',
@@ -211,10 +212,30 @@ export function createAccountEmbeds(account: LZTAccount): EmbedBuilder[] {
   
   embeds.push(mainEmbed);
 
+  // Log para debug - verificar estrutura dos dados
+  logger.info(`[DEBUG] Criando embeds para conta ${account.item_id}`);
+  logger.info(`[DEBUG] account.account_info existe? ${!!account.account_info}`);
+  logger.info(`[DEBUG] account.account_info?.weapon_skins existe? ${!!account.account_info?.weapon_skins}`);
+  logger.info(`[DEBUG] account.account_info?.weapon_skins length: ${account.account_info?.weapon_skins?.length || 0}`);
+  
+  if (account.account_info?.weapon_skins) {
+    logger.info(`[DEBUG] Primeira skin:`, JSON.stringify(account.account_info.weapon_skins[0], null, 2));
+  }
+
   // Criar embeds adicionais para skins com imagens (máximo 5 para não exceder limite do Discord)
   if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
     const skins = account.account_info.weapon_skins;
-    const skinsWithImages = skins.filter(skin => skin.image_url && skin.image_url.trim() !== '');
+    logger.info(`[DEBUG] Total de skins encontradas: ${skins.length}`);
+    
+    const skinsWithImages = skins.filter(skin => {
+      const hasImage = skin.image_url && skin.image_url.trim() !== '';
+      if (!hasImage) {
+        logger.info(`[DEBUG] Skin "${skin.name}" não tem image_url válida`);
+      }
+      return hasImage;
+    });
+    
+    logger.info(`[DEBUG] Skins com imagens válidas: ${skinsWithImages.length}`);
     
     // Criar até 5 embeds adicionais com imagens de skins
     const maxSkinEmbeds = Math.min(5, skinsWithImages.length);
@@ -224,6 +245,8 @@ export function createAccountEmbeds(account: LZTAccount): EmbedBuilder[] {
       if (!skin.image_url || skin.image_url.trim() === '') continue;
       
       try {
+        logger.info(`[DEBUG] Criando embed para skin "${skin.name}" com imagem: ${skin.image_url}`);
+        
         const skinEmbed = new EmbedBuilder()
           .setTitle(`🔫 ${skin.name}`)
           .setImage(skin.image_url)
@@ -237,9 +260,10 @@ export function createAccountEmbeds(account: LZTAccount): EmbedBuilder[] {
         }
         
         embeds.push(skinEmbed);
-      } catch (error) {
+        logger.info(`[DEBUG] Embed de skin "${skin.name}" adicionado com sucesso`);
+      } catch (error: any) {
         // Se houver erro ao criar embed da skin, continuar com as próximas
-        console.error(`Erro ao criar embed para skin ${skin.name}:`, error);
+        logger.error(`Erro ao criar embed para skin ${skin.name}:`, error);
       }
     }
     
@@ -266,6 +290,13 @@ export function createAccountEmbeds(account: LZTAccount): EmbedBuilder[] {
         embeds.push(remainingEmbed);
       }
     }
+  } else {
+    logger.info(`[DEBUG] Nenhuma skin encontrada em account.account_info.weapon_skins`);
+    logger.info(`[DEBUG] Estrutura completa da conta:`, JSON.stringify({
+      item_id: account.item_id,
+      has_account_info: !!account.account_info,
+      account_info_keys: account.account_info ? Object.keys(account.account_info) : [],
+    }, null, 2));
   }
 
   // Garantir que sempre retorne pelo menos o embed principal
@@ -273,6 +304,7 @@ export function createAccountEmbeds(account: LZTAccount): EmbedBuilder[] {
     embeds.push(mainEmbed);
   }
 
+  logger.info(`[DEBUG] Total de embeds criados: ${embeds.length}`);
   return embeds;
 }
 

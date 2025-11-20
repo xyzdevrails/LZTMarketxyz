@@ -30,6 +30,23 @@ export async function execute(
 
     const account = await lztService.getAccountDetails(itemId);
 
+    // Log para debug
+    logger.info(`[DEBUG] Dados da conta ${itemId} recebidos:`);
+    logger.info(`[DEBUG] account.account_info existe? ${!!account.account_info}`);
+    logger.info(`[DEBUG] account.account_info?.weapon_skins existe? ${!!account.account_info?.weapon_skins}`);
+    logger.info(`[DEBUG] account.account_info?.weapon_skins length: ${account.account_info?.weapon_skins?.length || 0}`);
+    
+    if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
+      logger.info(`[DEBUG] Primeira skin:`, JSON.stringify(account.account_info.weapon_skins[0], null, 2));
+    } else {
+      logger.info(`[DEBUG] Estrutura completa da conta:`, JSON.stringify({
+        item_id: account.item_id,
+        has_account_info: !!account.account_info,
+        account_info_keys: account.account_info ? Object.keys(account.account_info) : [],
+        all_keys: Object.keys(account),
+      }, null, 2));
+    }
+
     const embeds = createAccountEmbeds(account);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
