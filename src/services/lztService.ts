@@ -106,15 +106,21 @@ export class LZTService {
     return response.body;
   }
 
-  async getAccountImages(itemId: number, type: 'weapons' | 'agents' | 'buddies' = 'weapons'): Promise<{ image?: string; images?: string[] }> {
-    logger.info(`Buscando imagem da conta ${itemId} (tipo: ${type})`);
+  async getAccountImages(itemId: number, type?: 'weapons' | 'agents' | 'buddies'): Promise<{ image?: string; images?: string[] }> {
+    logger.info(`Buscando imagem da conta ${itemId}${type ? ` (tipo: ${type})` : ' (sem tipo)'}`);
 
     try {
+      // Tentar primeiro sem parâmetro type, depois com type se fornecido
+      const params: any = {};
+      if (type) {
+        params.type = type;
+      }
+      
       // O endpoint /image pode retornar uma única URL de imagem ou um objeto com image/images
       const response = await this.request<any>({
         method: 'GET',
         url: `/${itemId}/image`,
-        params: { type },
+        params: Object.keys(params).length > 0 ? params : undefined,
       });
 
       logger.info(`[DEBUG] Resposta do endpoint /image:`, JSON.stringify(response.body, null, 2));

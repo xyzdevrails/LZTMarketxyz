@@ -237,11 +237,19 @@ export async function createAccountEmbeds(
   let skinImageUrl: string | null = null;
 
   // ESTRATÉGIA 1: Tentar endpoint /image da API LZT (grid único)
+  // NOTA: Este endpoint pode não funcionar para todas as contas ou pode não existir
+  // Por isso, não é crítico se falhar - temos fallbacks nas estratégias 2 e 3
   if (lztService) {
     try {
       logger.info(`[DEBUG] Estratégia 1: Buscando imagem via endpoint /image da LZT`);
-      // A API LZT aceita 'weapons' (não 'skins') para skins de armas do Valorant
-      const imagesResponse = await lztService.getAccountImages(account.item_id, 'weapons');
+      // Tentar primeiro sem tipo, depois com 'weapons' se necessário
+      let imagesResponse = await lztService.getAccountImages(account.item_id);
+      
+      // Se não retornar nada, tentar com 'weapons'
+      if (!imagesResponse.image && (!imagesResponse.images || imagesResponse.images.length === 0)) {
+        logger.info(`[DEBUG] Tentando novamente com type='weapons'`);
+        imagesResponse = await lztService.getAccountImages(account.item_id, 'weapons');
+      }
       
       if (imagesResponse.image) {
         skinImageUrl = imagesResponse.image;
@@ -253,9 +261,12 @@ export async function createAccountEmbeds(
         if (skinImageUrl) {
           logger.info(`[DEBUG] ✅ Imagem encontrada via endpoint /image (array): ${skinImageUrl.substring(0, 50)}...`);
         }
+      } else {
+        logger.info(`[DEBUG] ⚠️ Endpoint /image não retornou imagens (isso é normal se o endpoint não existir ou não funcionar para esta conta)`);
       }
     } catch (error: any) {
-      logger.warn(`[DEBUG] ❌ Erro ao buscar imagem via endpoint /image:`, error.message);
+      // Não é crítico - o endpoint pode não existir ou não funcionar para todas as contas
+      logger.info(`[DEBUG] ⚠️ Endpoint /image não disponível ou retornou erro (isso é esperado):`, error.message);
     }
   }
 
