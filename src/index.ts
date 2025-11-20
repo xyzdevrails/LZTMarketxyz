@@ -13,6 +13,7 @@ import * as meusaldoCommand from './commands/meusaldo';
 import * as generateCommand from './commands/generate';
 import { WebhookServer } from './server/webhookServer';
 import { ExpirationService } from './services/expirationService';
+import { SkinsCacheService } from './services/skinsCacheService';
 
 interface Command {
   data: SlashCommandBuilder;
@@ -49,7 +50,7 @@ const lztService = new LZTService(
 
 const purchaseService = new PurchaseService(lztService);
 
-// Inicializar AccountPublisher
+// Inicializar AccountPublisher (cacheService será definido depois)
 import { AccountPublisher } from './services/accountPublisher';
 const accountPublisher = new AccountPublisher(lztService);
 generateCommand.setAccountPublisher(accountPublisher);
@@ -103,10 +104,29 @@ commands.set(generateCommand.data.name, generateCommand as unknown as Command);
 
 let webhookServer: any = null;
 let expirationService: ExpirationService | null = null;
+let skinsCacheService: SkinsCacheService | null = null;
 
 client.once(Events.ClientReady, async (readyClient) => {
   logger.info(`Bot conectado como ${readyClient.user.tag}!`);
   logger.info(`Bot ID: ${readyClient.user.id}`);
+  
+  // Inicializar cache de skins da API Valorant
+  try {
+    logger.info('[SkinsCache] Inicializando cache de skins da API Valorant...');
+    skinsCacheService = new SkinsCacheService();
+    const cacheLoaded = await skinsCacheService.loadValorantSkinsCache();
+    if (cacheLoaded) {
+      logger.info(`[SkinsCache] ✅ Cache de skins inicializado com sucesso (${skinsCacheService.getCacheSize()} skins)`);
+      // Passar cacheService para AccountPublisher para usar grid nas publicações automáticas
+      accountPublisher.setCacheService(skinsCacheService);
+      logger.info('[SkinsCache] ✅ CacheService configurado no AccountPublisher');
+    } else {
+      logger.warn('[SkinsCache] ⚠️ Cache de skins não pôde ser carregado, funcionalidade de grid pode não funcionar');
+    }
+  } catch (error: any) {
+    logger.error(`[SkinsCache] ❌ Erro ao inicializar cache de skins: ${error.message}`);
+    logger.warn('[SkinsCache] Funcionalidade de grid de skins pode não estar disponível');
+  }
   
   const efiInitialized = await initializeEfiServices();
   
@@ -266,7 +286,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     try {
       if (interaction.commandName === 'contas' || interaction.commandName === 'conta') {
-        await command.execute(interaction, lztService);
+        await command.execute(interaction, lztService, skinsCacheService);
       } else if (interaction.commandName === 'admin') {
         await command.execute(interaction, purchaseService, balanceService);
       } else if (interaction.commandName === 'adicionarsaldo') {

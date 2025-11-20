@@ -1,7 +1,9 @@
-import { EmbedBuilder, ColorResolvable } from 'discord.js';
+import { EmbedBuilder, ColorResolvable, AttachmentBuilder } from 'discord.js';
 import { LZTAccount } from '../types/lzt';
 import { logger } from './logger';
 import { ValorantApiService } from '../services/valorantApiService';
+import { SkinsGridGenerator } from './skinsGridGenerator';
+import { SkinsCacheService } from '../services/skinsCacheService';
 
 const RANK_EMOJIS: Record<string, string> = {
   'Ferro': '⚫',
@@ -205,15 +207,18 @@ function getValorantApiService(): ValorantApiService {
 
 /**
  * Cria embeds para uma conta, usando múltiplas estratégias para obter imagens de skins:
- * 1. Endpoint /image da API LZT (grid único com todas as skins) - PRIORIDADE ALTA
- * 2. image_url das skins individuais da LZT - FALLBACK 1
- * 3. API valorant-api.com baseada nos nomes das skins - FALLBACK 2
+ * 1. Grid de skins gerado (quando cacheService disponível) - PRIORIDADE ALTA
+ * 2. Endpoint /image da API LZT (grid único com todas as skins) - FALLBACK 1
+ * 3. image_url das skins individuais da LZT - FALLBACK 2
+ * 4. API valorant-api.com baseada nos nomes das skins - FALLBACK 3
  */
 export async function createAccountEmbeds(
   account: LZTAccount,
-  lztService?: any
-): Promise<EmbedBuilder[]> {
+  lztService?: any,
+  cacheService?: SkinsCacheService
+): Promise<{ embeds: EmbedBuilder[]; files?: AttachmentBuilder[] }> {
   const embeds: EmbedBuilder[] = [];
+  let files: AttachmentBuilder[] | undefined;
   
   // IMPORTANTE: Se account_info não estiver disponível, buscar detalhes completos da conta
   let accountWithDetails = account;
@@ -228,6 +233,27 @@ export async function createAccountEmbeds(
       logger.warn(`[DEBUG] ⚠️ Erro ao buscar detalhes completos da conta:`, error.message);
       // Continuar com os dados originais se falhar
       accountWithDetails = account;
+    }
+  }
+
+  // ESTRATÉGIA 0: Tentar gerar grid de skins (PRIORIDADE MÁXIMA)
+  if (cacheService && accountWithDetails.account_info?.weapon_skins && accountWithDetails.account_info.weapon_skins.length > 0) {
+    try {
+      logger.info(`[DEBUG] Tentando gerar grid de skins para conta ${accountWithDetails.item_id}...`);
+      const gridResult = await generateSkinsGridEmbed(accountWithDetails, cacheService, lztService);
+      
+      if (gridResult) {
+        logger.info(`[DEBUG] ✅ Grid de skins gerado com sucesso!`);
+        return {
+          embeds: [gridResult.embed],
+          files: gridResult.files,
+        };
+      } else {
+        logger.info(`[DEBUG] ⚠️ Grid não pôde ser gerado, usando fallback...`);
+      }
+    } catch (error: any) {
+      logger.warn(`[DEBUG] ⚠️ Erro ao gerar grid de skins: ${error.message}`);
+      logger.warn(`[DEBUG] Continuando com estratégias de fallback...`);
     }
   }
   
@@ -382,7 +408,7 @@ export async function createAccountEmbeds(
   }
 
   logger.info(`[DEBUG] Total de embeds criados: ${embeds.length}`);
-  return embeds;
+  return { embeds, files };
 }
 
 function getRarityEmoji(rarity?: string): string {
@@ -446,5 +472,92 @@ export function createAccountsListEmbed(
   });
 
   return embed;
+}
+
+/**
+ * Gera embed com grid de skins da conta
+ * Retorna objeto com embed e files (attachment) para enviar no Discord
+ */
+export async function generateSkinsGridEmbed(
+  account: LZTAccount,
+  cacheService: SkinsCacheService,
+  lztService?: any
+): Promise<{ embed: EmbedBuilder; files: AttachmentBuilder[] } | null> {
+  try {
+    logger.info(`[SkinsGridEmbed] Gerando grid de skins para conta ${account.item_id}`);
+
+    // Obter lista de skins da conta
+    let accountWithDetails = account;
+    if (!account.account_info?.weapon_skins && lztService) {
+      try {
+        logger.info(`[SkinsGridEmbed] Buscando detalhes completos da conta ${account.item_id}...`);
+        accountWithDetails = await lztService.getAccountDetails(account.item_id);
+      } catch (error: any) {
+        logger.warn(`[SkinsGridEmbed] Erro ao buscar detalhes: ${error.message}`);
+      }
+    }
+
+    const weaponSkins = accountWithDetails.account_info?.weapon_skins;
+    if (!weaponSkins || weaponSkins.length === 0) {
+      logger.warn(`[SkinsGridEmbed] Nenhuma skin encontrada para conta ${account.item_id}`);
+      return null;
+    }
+
+    logger.info(`[SkinsGridEmbed] ${weaponSkins.length} skins encontradas`);
+
+    // Criar gerador de grid
+    const gridGenerator = new SkinsGridGenerator(cacheService);
+
+    // Preparar dados das skins
+    const skinsData = weaponSkins.map(skin => ({
+      name: skin.name,
+      rarity: skin.rarity,
+      imageUrl: skin.image_url,
+    }));
+
+    // Gerar grid
+    const gridBuffer = await gridGenerator.generateSkinsGridImage(skinsData);
+
+    if (!gridBuffer) {
+      logger.warn(`[SkinsGridEmbed] Não foi possível gerar grid para conta ${account.item_id}`);
+      return null;
+    }
+
+    // Criar attachment
+    const attachment = new AttachmentBuilder(gridBuffer, {
+      name: 'skins-grid.png',
+      description: `Grid de skins da conta ${account.item_id}`,
+    });
+
+    // Criar embed com informações da conta
+    const embed = createAccountEmbed(accountWithDetails);
+
+    // Adicionar imagem do grid ao embed
+    embed.setImage('attachment://skins-grid.png');
+
+    // Adicionar informações sobre o grid
+    const skinsCount = weaponSkins.length;
+    const displayedCount = Math.min(skinsCount, 15);
+    if (skinsCount > displayedCount) {
+      embed.setFooter({
+        text: `Mostrando ${displayedCount} de ${skinsCount} skins (ordenadas por raridade)`,
+      });
+    } else {
+      embed.setFooter({
+        text: `${skinsCount} skins (ordenadas por raridade)`,
+      });
+    }
+
+    logger.info(`[SkinsGridEmbed] ✅ Grid gerado com sucesso para conta ${account.item_id}`);
+
+    return {
+      embed,
+      files: [attachment],
+    };
+  } catch (error: any) {
+    logger.error(`[SkinsGridEmbed] Erro ao gerar grid de skins: ${error.message}`);
+    logger.error(`[SkinsGridEmbed] Stack: ${error.stack}`);
+    return null;
+  }
 }
 

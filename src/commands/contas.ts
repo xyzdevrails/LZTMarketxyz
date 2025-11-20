@@ -39,7 +39,8 @@ export const data = new SlashCommandBuilder()
 async function renderAccountsList(
   lztService: LZTService,
   filters: LZTSearchFilters,
-  interactionOrMessage: ChatInputCommandInteraction | Message
+  interactionOrMessage: ChatInputCommandInteraction | Message,
+  cacheService?: any
 ): Promise<void> {
   
   const channel = interactionOrMessage.channel;
@@ -112,10 +113,10 @@ async function renderAccountsList(
       try {
         
         logger.info(`Criando embeds para conta ${account.item_id}...`);
-        const embeds = await createAccountEmbeds(account, lztService);
+        const result = await createAccountEmbeds(account, lztService, cacheService);
 
         // Adicionar footer no primeiro embed (principal)
-        embeds[0].setFooter({
+        result.embeds[0].setFooter({
           text: `Código de Identificação: HYPE_${account.item_id.toString().padStart(6, '0')}`,
         });
 
@@ -137,26 +138,28 @@ async function renderAccountsList(
             .setStyle(ButtonStyle.Secondary)
         );
 
-        logger.info(`Enviando mensagem com ${embeds.length} embed(s) para conta ${account.item_id}...`);
+        logger.info(`Enviando mensagem com ${result.embeds.length} embed(s) para conta ${account.item_id}...`);
         logger.info(`Detalhes dos embeds:`, {
-          totalEmbeds: embeds.length,
-          hasMainEmbed: embeds.length > 0,
-          skinEmbeds: embeds.length - 1,
+          totalEmbeds: result.embeds.length,
+          hasMainEmbed: result.embeds.length > 0,
+          hasFiles: !!result.files,
+          filesCount: result.files?.length || 0,
         });
         
         try {
           await channel.send({
-            embeds: embeds,
+            embeds: result.embeds,
+            files: result.files,
             components: [actionRow],
           });
           logger.info(`✅ Mensagem enviada com sucesso para conta ${account.item_id}`);
         } catch (sendError: any) {
           logger.error(`Erro ao enviar mensagem para conta ${account.item_id}:`, sendError);
           // Tentar enviar apenas o embed principal em caso de erro
-          if (embeds.length > 0) {
+          if (result.embeds.length > 0) {
             try {
               await channel.send({
-                embeds: [embeds[0]],
+                embeds: [result.embeds[0]],
                 components: [actionRow],
               });
               logger.info(`✅ Mensagem enviada com embed principal apenas para conta ${account.item_id}`);
@@ -228,7 +231,8 @@ async function renderAccountsList(
 
 export async function execute(
   interaction: ChatInputCommandInteraction,
-  lztService: LZTService
+  lztService: LZTService,
+  cacheService?: any
 ): Promise<void> {
   logger.info(`Executando comando /contas para usuário ${interaction.user.tag}`);
   
@@ -271,6 +275,6 @@ export async function execute(
     filters.price_max = priceMax;
   }
 
-  await renderAccountsList(lztService, filters, interaction);
+  await renderAccountsList(lztService, filters, interaction, cacheService);
 }
 

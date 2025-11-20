@@ -5,6 +5,7 @@ import { createAccountEmbeds } from '../utils/embedBuilder';
 import { publishedAccountsStorage } from '../storage/publishedAccounts';
 import { logger } from '../utils/logger';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SkinsCacheService } from './skinsCacheService';
 
 export class AccountPublisher {
   private intervalId: NodeJS.Timeout | null = null;
@@ -12,9 +13,15 @@ export class AccountPublisher {
   private client: Client | null = null;
   private channelId: string | null = null;
   private lztService: LZTService;
+  private cacheService: SkinsCacheService | null = null;
 
-  constructor(lztService: LZTService) {
+  constructor(lztService: LZTService, cacheService?: SkinsCacheService) {
     this.lztService = lztService;
+    this.cacheService = cacheService || null;
+  }
+
+  setCacheService(cacheService: SkinsCacheService): void {
+    this.cacheService = cacheService;
   }
 
   async start(client: Client, channelId: string): Promise<{ success: boolean; error?: string }> {
@@ -149,10 +156,10 @@ export class AccountPublisher {
         }
 
         try {
-          const embeds = await createAccountEmbeds(account, this.lztService);
+          const result = await createAccountEmbeds(account, this.lztService, this.cacheService || undefined);
           
           // Adicionar footer no primeiro embed (principal)
-          embeds[0].setFooter({
+          result.embeds[0].setFooter({
             text: `Código de Identificação: HYPE_${account.item_id.toString().padStart(6, '0')}`,
           });
 
@@ -174,7 +181,8 @@ export class AccountPublisher {
           );
 
           const message = await channel.send({
-            embeds: embeds,
+            embeds: result.embeds,
+            files: result.files,
             components: [actionRow],
           });
 

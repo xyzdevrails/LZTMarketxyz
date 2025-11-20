@@ -21,7 +21,8 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(
   interaction: ChatInputCommandInteraction,
-  lztService: LZTService
+  lztService: LZTService,
+  cacheService?: any
 ): Promise<void> {
   await interaction.deferReply();
 
@@ -47,7 +48,7 @@ export async function execute(
       }, null, 2));
     }
 
-    const embeds = await createAccountEmbeds(account, lztService);
+    const result = await createAccountEmbeds(account, lztService, cacheService);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
@@ -65,7 +66,8 @@ export async function execute(
     );
 
     await interaction.editReply({
-      embeds: embeds,
+      embeds: result.embeds,
+      files: result.files,
       components: [row],
     });
   } catch (error: any) {
