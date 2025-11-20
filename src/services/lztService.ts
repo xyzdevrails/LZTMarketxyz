@@ -106,20 +106,44 @@ export class LZTService {
     return response.body;
   }
 
-  async getAccountImages(itemId: number, type: 'skins' | 'pickaxes' | 'dances' | 'gliders' | 'weapons' | 'agents' | 'buddies' = 'skins'): Promise<{ images: string[] }> {
-    logger.info(`Buscando imagens da conta ${itemId} (tipo: ${type})`);
+  async getAccountImages(itemId: number, type: 'skins' | 'pickaxes' | 'dances' | 'gliders' | 'weapons' | 'agents' | 'buddies' = 'skins'): Promise<{ image?: string; images?: string[] }> {
+    logger.info(`Buscando imagem da conta ${itemId} (tipo: ${type})`);
 
     try {
-      const response = await this.request<{ images: string[] }>({
+      // O endpoint /image pode retornar uma única URL de imagem ou um objeto com image/images
+      const response = await this.request<any>({
         method: 'GET',
         url: `/${itemId}/image`,
         params: { type },
       });
 
-      return response.body;
+      logger.info(`[DEBUG] Resposta do endpoint /image:`, JSON.stringify(response.body, null, 2));
+
+      // Verificar diferentes formatos de resposta possíveis
+      if (typeof response.body === 'string') {
+        // Se retornar uma string direta (URL)
+        return { image: response.body };
+      } else if (response.body?.image) {
+        // Se retornar objeto com campo 'image'
+        return { image: response.body.image };
+      } else if (response.body?.images && Array.isArray(response.body.images)) {
+        // Se retornar array de imagens
+        return { images: response.body.images };
+      } else if (response.body?.url) {
+        // Se retornar objeto com campo 'url'
+        return { image: response.body.url };
+      }
+
+      // Fallback: retornar o body inteiro como possível URL
+      return { image: typeof response.body === 'string' ? response.body : undefined };
     } catch (error: any) {
-      logger.error(`Erro ao buscar imagens da conta ${itemId}:`, error);
-      return { images: [] };
+      logger.error(`Erro ao buscar imagem da conta ${itemId}:`, error);
+      logger.error(`[DEBUG] Detalhes do erro:`, {
+        message: error.message,
+        statusCode: error.statusCode,
+        code: error.code,
+      });
+      return {};
     }
   }
 

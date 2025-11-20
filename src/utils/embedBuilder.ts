@@ -193,9 +193,9 @@ export function createAccountEmbed(account: LZTAccount): EmbedBuilder {
 }
 
 /**
- * Cria múltiplos embeds para uma conta, permitindo mostrar várias imagens de skins
- * Retorna array com embed principal + embeds de skins (até 5 imagens)
- * Agora busca imagens através do endpoint /image da API LZT
+ * Cria embeds para uma conta, usando imagem única do endpoint /image (grid com todas as skins)
+ * Retorna array com embed principal contendo a imagem única (grid) das skins
+ * O endpoint /image retorna uma única imagem (print) com todas as skins em um grid
  */
 export async function createAccountEmbeds(
   account: LZTAccount,
@@ -226,23 +226,32 @@ export async function createAccountEmbeds(
     logger.info(`[DEBUG] Primeira skin:`, JSON.stringify(account.account_info.weapon_skins[0], null, 2));
   }
 
-  // Buscar imagens das skins através do endpoint /image da API LZT
-  // SEMPRE tentar buscar imagens, mesmo se account_info não existir
-  let skinImages: string[] = [];
+  // Buscar imagem das skins através do endpoint /image da API LZT
+  // O endpoint retorna uma única imagem (grid) com todas as skins, não múltiplas URLs
+  let skinImageUrl: string | null = null;
   if (lztService) {
     try {
-      logger.info(`[DEBUG] Buscando imagens das skins para conta ${account.item_id} através do endpoint /image`);
+      logger.info(`[DEBUG] Buscando imagem das skins para conta ${account.item_id} através do endpoint /image`);
       const imagesResponse = await lztService.getAccountImages(account.item_id, 'skins');
-      skinImages = imagesResponse.images || [];
-      logger.info(`[DEBUG] ${skinImages.length} imagem(ns) de skins encontrada(s) do endpoint /image`);
       
-      if (skinImages.length > 0) {
-        logger.info(`[DEBUG] Primeiras 3 URLs de imagens:`, skinImages.slice(0, 3));
+      // Verificar se retornou uma única imagem ou array de imagens
+      if (imagesResponse.image) {
+        skinImageUrl = imagesResponse.image;
+        if (skinImageUrl) {
+          logger.info(`[DEBUG] Imagem única encontrada: ${skinImageUrl.substring(0, 50)}...`);
+        }
+      } else if (imagesResponse.images && imagesResponse.images.length > 0) {
+        // Se retornar array, usar a primeira imagem (ou todas se necessário)
+        skinImageUrl = imagesResponse.images[0] || null;
+        if (skinImageUrl) {
+          logger.info(`[DEBUG] Primeira imagem do array encontrada: ${skinImageUrl.substring(0, 50)}...`);
+          logger.info(`[DEBUG] Total de ${imagesResponse.images.length} imagem(ns) no array`);
+        }
       } else {
         logger.info(`[DEBUG] Nenhuma imagem retornada do endpoint /image`);
       }
     } catch (error: any) {
-      logger.error(`[DEBUG] Erro ao buscar imagens das skins:`, error);
+      logger.error(`[DEBUG] Erro ao buscar imagem das skins:`, error);
       logger.error(`[DEBUG] Detalhes do erro:`, {
         message: error.message,
         statusCode: error.statusCode,
@@ -253,85 +262,30 @@ export async function createAccountEmbeds(
     logger.info(`[DEBUG] lztService não disponível para buscar imagens`);
   }
 
-  // Criar embeds adicionais para skins com imagens (máximo 5 para não exceder limite do Discord)
-  // Se tivermos imagens do endpoint /image, criar embeds mesmo sem weapon_skins na resposta
-  if (skinImages.length > 0) {
-    logger.info(`[DEBUG] Criando ${Math.min(5, skinImages.length)} embed(s) com imagens de skins`);
-    
-    const maxSkinEmbeds = Math.min(5, skinImages.length);
-    
-    for (let i = 0; i < maxSkinEmbeds; i++) {
-      const imageUrl = skinImages[i];
-      if (!imageUrl || imageUrl.trim() === '') continue;
-      
-      try {
-        logger.info(`[DEBUG] Criando embed ${i + 1}/${maxSkinEmbeds} com imagem: ${imageUrl.substring(0, 50)}...`);
-        
-        const skinEmbed = new EmbedBuilder()
-          .setTitle(`🔫 Skin ${i + 1}`)
-          .setImage(imageUrl)
-          .setColor(0x5865F2)
-          .setDescription('Skin de arma da conta');
-        
-        embeds.push(skinEmbed);
-        logger.info(`[DEBUG] Embed de skin ${i + 1} adicionado com sucesso`);
-      } catch (error: any) {
-        logger.error(`Erro ao criar embed para skin ${i + 1}:`, error);
-      }
-    }
-    
-    // Se houver mais imagens além das mostradas, criar um embed informativo
-    if (skinImages.length > maxSkinEmbeds) {
-      const remainingCount = skinImages.length - maxSkinEmbeds;
-      const remainingEmbed = new EmbedBuilder()
-        .setTitle('🔫 Mais Skins')
-        .setDescription(`*Esta conta possui mais ${remainingCount} skin(s) além das mostradas acima.*`)
-        .setColor(0x5865F2);
-      
-      embeds.push(remainingEmbed);
-    }
+  // Usar a imagem única do endpoint /image como imagem principal do embed
+  // O endpoint retorna uma única imagem (grid) com todas as skins
+  if (skinImageUrl) {
+    logger.info(`[DEBUG] Adicionando imagem única das skins ao embed principal`);
+    mainEmbed.setImage(skinImageUrl);
   } else if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
-    // Fallback: usar weapon_skins se disponível (caso raro)
-    const skins = account.account_info.weapon_skins;
-    logger.info(`[DEBUG] Total de skins encontradas em weapon_skins: ${skins.length}`);
-    
-    const maxSkinEmbeds = Math.min(5, skins.length);
-    
-    for (let i = 0; i < maxSkinEmbeds; i++) {
-      const skin = skins[i];
-      if (!skin) continue;
-      
-      const imageUrl = skin.image_url;
-      if (!imageUrl || imageUrl.trim() === '') continue;
-      
-      try {
-        logger.info(`[DEBUG] Criando embed para skin "${skin.name}" com imagem: ${imageUrl}`);
-        
-        const skinEmbed = new EmbedBuilder()
-          .setTitle(`🔫 ${skin.name}`)
-          .setImage(imageUrl)
-          .setColor(0x5865F2);
-        
-        if (skin.rarity) {
-          const rarityEmoji = getRarityEmoji(skin.rarity);
-          skinEmbed.setDescription(`${rarityEmoji} Raridade: **${skin.rarity}**`);
-        } else {
-          skinEmbed.setDescription('Skin de arma');
-        }
-        
-        embeds.push(skinEmbed);
-        logger.info(`[DEBUG] Embed de skin "${skin.name}" adicionado com sucesso`);
-      } catch (error: any) {
-        logger.error(`Erro ao criar embed para skin ${skin.name}:`, error);
-      }
+    // Fallback: usar primeira skin se tiver image_url
+    const firstSkinWithImage = account.account_info.weapon_skins.find(skin => skin.image_url);
+    if (firstSkinWithImage?.image_url) {
+      logger.info(`[DEBUG] Usando image_url da primeira skin como fallback`);
+      mainEmbed.setImage(firstSkinWithImage.image_url);
     }
+  }
+
+  // Não criar embeds adicionais - a imagem única do endpoint /image já contém todas as skins em um grid
+  // O endpoint retorna uma única imagem (print/grid) com todas as skins, não múltiplas URLs
+  if (skinImageUrl) {
+    logger.info(`[DEBUG] Imagem única do grid de skins adicionada ao embed principal`);
   } else {
-    logger.info(`[DEBUG] Nenhuma imagem encontrada do endpoint /image e nenhuma skin em account.account_info.weapon_skins`);
-    logger.info(`[DEBUG] Estrutura completa da conta:`, JSON.stringify({
+    logger.info(`[DEBUG] Nenhuma imagem encontrada do endpoint /image`);
+    logger.info(`[DEBUG] Estrutura da conta:`, JSON.stringify({
       item_id: account.item_id,
       has_account_info: !!account.account_info,
       account_info_keys: account.account_info ? Object.keys(account.account_info) : [],
-      all_keys: Object.keys(account).slice(0, 10), // Primeiras 10 chaves
     }, null, 2));
   }
 
