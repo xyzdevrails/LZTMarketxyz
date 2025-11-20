@@ -67,8 +67,31 @@ async function renderAccountsList(
       return;
     }
 
+    // Filtrar apenas contas publicadas nas últimas 48 horas
+    const now = Date.now();
+    const maxAge = 48 * 60 * 60 * 1000; // 48 horas em milissegundos
+    const recentAccounts = response.items.filter(account => {
+      if (!account.published_at) return false;
+      const publishedTime = new Date(account.published_at).getTime();
+      const age = now - publishedTime;
+      return age <= maxAge; // Apenas contas com menos de 48 horas
+    });
+
+    if (recentAccounts.length === 0) {
+      logger.info('Nenhuma conta recente encontrada (últimas 48h)');
+      const content = '❌ Nenhuma conta encontrada publicada nas últimas 48 horas com os filtros especificados.';
+      if ('editReply' in interactionOrMessage) {
+        await interactionOrMessage.editReply({ content });
+      } else {
+        await interactionOrMessage.edit({ content });
+      }
+      return;
+    }
+
     const quantidade = filters.per_page || 10;
-    const accountsToShow = response.items.slice(0, Math.min(quantidade, 20));
+    const accountsToShow = recentAccounts.slice(0, Math.min(quantidade, 20));
+    
+    logger.info(`Filtradas ${recentAccounts.length} contas recentes (últimas 48h) de ${response.items.length} total`);
     
     logger.info(`Preparando para enviar ${accountsToShow.length} conta(s)...`);
 
@@ -207,7 +230,8 @@ export async function execute(
   const filters: LZTSearchFilters = {
     page: 1,
     per_page: Math.min(quantidade, 20), 
-    order_by: 'price_to_up',
+    // Ordenar por data de publicação descendente (mais recentes primeiro)
+    order_by: 'pdate_to_down',
     // Filtros específicos de Valorant: Brasil, região BR, mínimo 3 skins, nível 20+
     country: 'Bra',
     valorant_region: 'BR',

@@ -10,6 +10,7 @@ import * as contaCommand from './commands/conta';
 import * as adminCommand from './commands/admin';
 import * as adicionarsaldoCommand from './commands/adicionarsaldo';
 import * as meusaldoCommand from './commands/meusaldo';
+import * as generateCommand from './commands/generate';
 import { WebhookServer } from './server/webhookServer';
 import { ExpirationService } from './services/expirationService';
 
@@ -47,6 +48,11 @@ const lztService = new LZTService(
 );
 
 const purchaseService = new PurchaseService(lztService);
+
+// Inicializar AccountPublisher
+import { AccountPublisher } from './services/accountPublisher';
+const accountPublisher = new AccountPublisher(lztService);
+generateCommand.setAccountPublisher(accountPublisher);
 
 let efiService: any = null;
 let balanceService: any = null;
@@ -93,6 +99,7 @@ commands.set(contasCommand.data.name, contasCommand as Command);
 commands.set(contaCommand.data.name, contaCommand as Command);
 commands.set(adminCommand.data.name, adminCommand as Command);
 commands.set(meusaldoCommand.data.name, meusaldoCommand as Command);
+commands.set(generateCommand.data.name, generateCommand as unknown as Command);
 
 let webhookServer: any = null;
 let expirationService: ExpirationService | null = null;
@@ -285,6 +292,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
           return;
         }
         await command.execute(interaction, balanceService);
+      } else if (interaction.commandName === 'generate') {
+        await command.execute(interaction, client);
       } else {
         await command.execute(interaction);
       }
