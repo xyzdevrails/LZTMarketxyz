@@ -1,6 +1,7 @@
 import { EmbedBuilder, ColorResolvable } from 'discord.js';
 import { LZTAccount } from '../types/lzt';
 import { logger } from './logger';
+import { ValorantApiService } from '../services/valorantApiService';
 
 const RANK_EMOJIS: Record<string, string> = {
   'Ferro': '⚫',
@@ -192,10 +193,21 @@ export function createAccountEmbed(account: LZTAccount): EmbedBuilder {
   return embed;
 }
 
+// Instância singleton do ValorantApiService para reutilizar cache
+let valorantApiService: ValorantApiService | null = null;
+
+function getValorantApiService(): ValorantApiService {
+  if (!valorantApiService) {
+    valorantApiService = new ValorantApiService();
+  }
+  return valorantApiService;
+}
+
 /**
- * Cria embeds para uma conta, usando imagem única do endpoint /image (grid com todas as skins)
- * Retorna array com embed principal contendo a imagem única (grid) das skins
- * O endpoint /image retorna uma única imagem (print) com todas as skins em um grid
+ * Cria embeds para uma conta, usando múltiplas estratégias para obter imagens de skins:
+ * 1. Endpoint /image da API LZT (grid único com todas as skins) - PRIORIDADE ALTA
+ * 2. image_url das skins individuais da LZT - FALLBACK 1
+ * 3. API valorant-api.com baseada nos nomes das skins - FALLBACK 2
  */
 export async function createAccountEmbeds(
   account: LZTAccount,
@@ -221,71 +233,102 @@ export async function createAccountEmbeds(
   logger.info(`[DEBUG] account.account_info existe? ${!!account.account_info}`);
   logger.info(`[DEBUG] account.account_info?.weapon_skins existe? ${!!account.account_info?.weapon_skins}`);
   logger.info(`[DEBUG] account.account_info?.weapon_skins length: ${account.account_info?.weapon_skins?.length || 0}`);
-  
-  if (account.account_info?.weapon_skins) {
-    logger.info(`[DEBUG] Primeira skin:`, JSON.stringify(account.account_info.weapon_skins[0], null, 2));
-  }
 
-  // Buscar imagem das skins através do endpoint /image da API LZT
-  // O endpoint retorna uma única imagem (grid) com todas as skins, não múltiplas URLs
   let skinImageUrl: string | null = null;
+
+  // ESTRATÉGIA 1: Tentar endpoint /image da API LZT (grid único)
   if (lztService) {
     try {
-      logger.info(`[DEBUG] Buscando imagem das skins para conta ${account.item_id} através do endpoint /image`);
+      logger.info(`[DEBUG] Estratégia 1: Buscando imagem via endpoint /image da LZT`);
       const imagesResponse = await lztService.getAccountImages(account.item_id, 'skins');
       
-      // Verificar se retornou uma única imagem ou array de imagens
       if (imagesResponse.image) {
         skinImageUrl = imagesResponse.image;
         if (skinImageUrl) {
-          logger.info(`[DEBUG] Imagem única encontrada: ${skinImageUrl.substring(0, 50)}...`);
+          logger.info(`[DEBUG] ✅ Imagem encontrada via endpoint /image: ${skinImageUrl.substring(0, 50)}...`);
         }
       } else if (imagesResponse.images && imagesResponse.images.length > 0) {
-        // Se retornar array, usar a primeira imagem (ou todas se necessário)
         skinImageUrl = imagesResponse.images[0] || null;
         if (skinImageUrl) {
-          logger.info(`[DEBUG] Primeira imagem do array encontrada: ${skinImageUrl.substring(0, 50)}...`);
-          logger.info(`[DEBUG] Total de ${imagesResponse.images.length} imagem(ns) no array`);
+          logger.info(`[DEBUG] ✅ Imagem encontrada via endpoint /image (array): ${skinImageUrl.substring(0, 50)}...`);
         }
-      } else {
-        logger.info(`[DEBUG] Nenhuma imagem retornada do endpoint /image`);
       }
     } catch (error: any) {
-      logger.error(`[DEBUG] Erro ao buscar imagem das skins:`, error);
-      logger.error(`[DEBUG] Detalhes do erro:`, {
-        message: error.message,
-        statusCode: error.statusCode,
-        code: error.code,
-      });
+      logger.warn(`[DEBUG] ❌ Erro ao buscar imagem via endpoint /image:`, error.message);
     }
-  } else {
-    logger.info(`[DEBUG] lztService não disponível para buscar imagens`);
   }
 
-  // Usar a imagem única do endpoint /image como imagem principal do embed
-  // O endpoint retorna uma única imagem (grid) com todas as skins
-  if (skinImageUrl) {
-    logger.info(`[DEBUG] Adicionando imagem única das skins ao embed principal`);
-    mainEmbed.setImage(skinImageUrl);
-  } else if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
-    // Fallback: usar primeira skin se tiver image_url
+  // ESTRATÉGIA 2: Usar image_url das skins individuais (se disponível)
+  if (!skinImageUrl && account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
+    logger.info(`[DEBUG] Estratégia 2: Tentando usar image_url das skins individuais`);
     const firstSkinWithImage = account.account_info.weapon_skins.find(skin => skin.image_url);
     if (firstSkinWithImage?.image_url) {
-      logger.info(`[DEBUG] Usando image_url da primeira skin como fallback`);
-      mainEmbed.setImage(firstSkinWithImage.image_url);
+      skinImageUrl = firstSkinWithImage.image_url;
+      logger.info(`[DEBUG] ✅ Imagem encontrada via image_url da primeira skin: ${skinImageUrl.substring(0, 50)}...`);
     }
   }
 
-  // Não criar embeds adicionais - a imagem única do endpoint /image já contém todas as skins em um grid
-  // O endpoint retorna uma única imagem (print/grid) com todas as skins, não múltiplas URLs
+  // ESTRATÉGIA 3: Usar API valorant-api.com para buscar imagens baseadas nos nomes das skins
+  if (!skinImageUrl && account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
+    try {
+      logger.info(`[DEBUG] Estratégia 3: Buscando imagens via API valorant-api.com`);
+      const valorantApi = getValorantApiService();
+      
+      // Tentar buscar imagem da primeira skin mais importante (geralmente a mais rara ou primeira da lista)
+      const skins = account.account_info.weapon_skins;
+      
+      // Ordenar por raridade (se disponível) ou usar a primeira
+      const sortedSkins = [...skins].sort((a, b) => {
+        const rarityOrder: Record<string, number> = {
+          'exclusive': 5,
+          'ultra': 4,
+          'premium': 3,
+          'deluxe': 3,
+          'select': 2,
+          'superior': 2,
+          'standard': 1,
+          'normal': 1,
+        };
+        
+        const aRarity = a.rarity?.toLowerCase() || '';
+        const bRarity = b.rarity?.toLowerCase() || '';
+        const aOrder = Object.entries(rarityOrder).find(([key]) => aRarity.includes(key))?.[1] || 0;
+        const bOrder = Object.entries(rarityOrder).find(([key]) => bRarity.includes(key))?.[1] || 0;
+        
+        return bOrder - aOrder; // Ordenar do mais raro para o menos raro
+      });
+      
+      // Tentar buscar imagem das primeiras 3 skins mais importantes
+      for (const skin of sortedSkins.slice(0, 3)) {
+        if (skin.name) {
+          const apiImageUrl = await valorantApi.getSkinImage(skin.name);
+          if (apiImageUrl) {
+            skinImageUrl = apiImageUrl;
+            logger.info(`[DEBUG] ✅ Imagem encontrada via valorant-api.com para "${skin.name}": ${skinImageUrl.substring(0, 50)}...`);
+            break; // Usar a primeira imagem encontrada
+          }
+        }
+      }
+      
+      if (!skinImageUrl) {
+        logger.warn(`[DEBUG] ❌ Nenhuma imagem encontrada via valorant-api.com para as skins disponíveis`);
+      }
+    } catch (error: any) {
+      logger.error(`[DEBUG] ❌ Erro ao buscar imagem via valorant-api.com:`, error.message);
+    }
+  }
+
+  // Adicionar imagem ao embed se encontrada
   if (skinImageUrl) {
-    logger.info(`[DEBUG] Imagem única do grid de skins adicionada ao embed principal`);
+    logger.info(`[DEBUG] ✅ Adicionando imagem ao embed principal`);
+    mainEmbed.setImage(skinImageUrl);
   } else {
-    logger.info(`[DEBUG] Nenhuma imagem encontrada do endpoint /image`);
+    logger.warn(`[DEBUG] ⚠️ Nenhuma imagem de skin encontrada após todas as estratégias`);
     logger.info(`[DEBUG] Estrutura da conta:`, JSON.stringify({
       item_id: account.item_id,
       has_account_info: !!account.account_info,
       account_info_keys: account.account_info ? Object.keys(account.account_info) : [],
+      weapon_skins_count: account.account_info?.weapon_skins?.length || 0,
     }, null, 2));
   }
 
