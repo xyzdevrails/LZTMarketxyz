@@ -36,52 +36,48 @@ export function createAccountEmbed(account: LZTAccount): EmbedBuilder {
 
   const fields: Array<{ name: string; value: string; inline: boolean }> = [];
 
-  embed.setDescription(`💰 **Preço: R$ ${account.price.toFixed(2)}**\n\n**Valorant:**`);
+  // Descrição principal com preço
+  embed.setDescription(`💰 **Preço: R$ ${account.price.toFixed(2)}**`);
 
   if (account.account_info) {
     const info = account.account_info;
 
+    // Primeira linha: Skins, VP, Valor Inventário
+    const statsLine: string[] = [];
+    
     if (info.skins_count !== undefined) {
-      fields.push({
-        name: '🎨 Skins',
-        value: `${info.skins_count}`,
-        inline: true,
-      });
+      statsLine.push(`🎨 **${info.skins_count}** Skins`);
     }
 
     if (info.valorant_points !== undefined) {
-      fields.push({
-        name: '🪙 Valorant Points',
-        value: `${info.valorant_points} VP`,
-        inline: true,
-      });
+      statsLine.push(`🪙 **${info.valorant_points}** VP`);
     }
 
     if (info.inventory_value !== undefined) {
+      statsLine.push(`💼 **${info.inventory_value}** VP`);
+    }
+
+    if (statsLine.length > 0) {
       fields.push({
-        name: '💼 Valor Inventário',
-        value: `${info.inventory_value} VP`,
-        inline: true,
+        name: '📊 Estatísticas',
+        value: statsLine.join(' • '),
+        inline: false,
       });
     }
 
+    // Segunda linha: Risco, Atividade, Rank
+    const infoLine: string[] = [];
+
     if (info.recovery_risk) {
+      const riskEmoji = info.recovery_risk === 'Alto' ? '🔴' : info.recovery_risk === 'Médio' ? '🟡' : '🟢';
+      infoLine.push(`${riskEmoji} Risco: **${info.recovery_risk}**`);
+      
       const riskColor = RISK_COLORS[info.recovery_risk] || 0x808080;
       embed.setColor(riskColor);
-      
-      fields.push({
-        name: '⚠️ Risco de Recuperação',
-        value: info.recovery_risk,
-        inline: true,
-      });
     }
 
     if (info.last_activity) {
-      fields.push({
-        name: '🕐 Última Atividade',
-        value: info.last_activity,
-        inline: true,
-      });
+      infoLine.push(`🕐 **${info.last_activity}**`);
     }
 
     if (info.current_rank) {
@@ -89,70 +85,182 @@ export function createAccountEmbed(account: LZTAccount): EmbedBuilder {
         info.current_rank?.toLowerCase().includes(r.toLowerCase())
       ) || '';
       
+      infoLine.push(`${RANK_EMOJIS[rankEmoji] || '🛡️'} **${info.current_rank}**`);
+    }
+
+    if (infoLine.length > 0) {
       fields.push({
-        name: '🛡️ Rank Atual',
-        value: `${RANK_EMOJIS[rankEmoji] || '🏆'} ${info.current_rank}`,
-        inline: true,
+        name: 'ℹ️ Informações',
+        value: infoLine.join(' • '),
+        inline: false,
       });
     }
 
+    // Terceira linha: Verificações e Região
+    const verificationLine: string[] = [];
+
     if (info.email_verified !== undefined) {
-      fields.push({
-        name: '📧 Email Verificado',
-        value: info.email_verified ? '✅ Sim' : '❌ Não',
-        inline: true,
-      });
+      verificationLine.push(`📧 ${info.email_verified ? '✅' : '❌'} Email`);
+    } else if (account.is_email_verified !== undefined) {
+      verificationLine.push(`📧 ${account.is_email_verified ? '✅' : '❌'} Email`);
     }
 
     if (info.phone_verified !== undefined) {
-      fields.push({
-        name: '📱 Telefone Verificado',
-        value: info.phone_verified ? '✅ Sim' : '❌ Não',
-        inline: true,
-      });
+      verificationLine.push(`📱 ${info.phone_verified ? '✅' : '❌'} Telefone`);
+    } else if (account.is_phone_verified !== undefined) {
+      verificationLine.push(`📱 ${account.is_phone_verified ? '✅' : '❌'} Telefone`);
     }
 
     if (info.region) {
+      verificationLine.push(`🌍 **${info.region}**`);
+    } else if (account.riot_country) {
+      verificationLine.push(`🌍 **${account.riot_country}**`);
+    }
+
+    if (verificationLine.length > 0) {
       fields.push({
-        name: '🌍 Região',
-        value: info.region,
+        name: '✅ Verificações',
+        value: verificationLine.join(' • '),
+        inline: false,
+      });
+    }
+  } else {
+    // Fallback para dados diretos da conta
+    if (account.is_email_verified !== undefined) {
+      fields.push({
+        name: '📧 Email Verificado',
+        value: account.is_email_verified ? '✅ Sim' : '❌ Não',
+        inline: true,
+      });
+    }
+
+    if (account.is_phone_verified !== undefined) {
+      fields.push({
+        name: '📱 Telefone Verificado',
+        value: account.is_phone_verified ? '✅ Sim' : '❌ Não',
         inline: true,
       });
     }
   }
 
-  if (account.is_email_verified !== undefined) {
-    fields.push({
-      name: '📧 Email Verificado',
-      value: account.is_email_verified ? '✅ Sim' : '❌ Não',
-      inline: true,
-    });
-  }
-
-  if (account.is_phone_verified !== undefined) {
-    fields.push({
-      name: '📱 Telefone Verificado',
-      value: account.is_phone_verified ? '✅ Sim' : '❌ Não',
-      inline: true,
-    });
-  }
-
+  // Seção de Skins - melhorada para mostrar de forma visual em grid
   if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
-    const skinsList = account.account_info.weapon_skins
-      .slice(0, 10)
-      .map(skin => `• ${skin.name}`)
-      .join('\n');
+    const skins = account.account_info.weapon_skins;
+    const skinsCount = account.account_info.skins_count || skins.length;
+    
+    // Criar grid visual de skins (máximo 15 para não ficar muito longo)
+    const displaySkins = skins.slice(0, 15);
+    const skinLines: string[] = [];
+    
+    // Agrupar em linhas de 3 para criar um grid visual (como na imagem)
+    for (let i = 0; i < displaySkins.length; i += 3) {
+      const lineSkins = displaySkins.slice(i, i + 3);
+      const skinNames = lineSkins.map(skin => {
+        // Adicionar emoji baseado na raridade se disponível
+        const rarityEmoji = getRarityEmoji(skin.rarity);
+        // Formatar nome da skin de forma mais compacta
+        const shortName = skin.name.length > 20 ? skin.name.substring(0, 17) + '...' : skin.name;
+        return `${rarityEmoji} **${shortName}**`;
+      }).join('  ');
+      skinLines.push(skinNames);
+    }
+    
+    const skinsText = skinLines.join('\n');
+    const remainingCount = skins.length > 15 ? `\n\n*... e mais ${skins.length - 15} skin(s)*` : '';
     
     fields.push({
-      name: '🔫 Skins de Armas',
-      value: skinsList + (account.account_info.weapon_skins.length > 10 ? '\n...' : ''),
+      name: `🔫 Skins de Armas (${skinsCount} total)`,
+      value: skinsText + remainingCount,
       inline: false,
     });
+
+    // Usar imagem da primeira skin como imagem principal do embed (mais visível)
+    // Se não tiver, usar thumbnail
+    if (skins[0]?.image_url) {
+      embed.setImage(skins[0].image_url);
+    }
+    
+    // Se tiver segunda skin, usar como thumbnail
+    if (skins[1]?.image_url) {
+      embed.setThumbnail(skins[1].image_url);
+    }
   }
 
   embed.addFields(fields);
 
   return embed;
+}
+
+/**
+ * Cria múltiplos embeds para uma conta, permitindo mostrar várias imagens de skins
+ * Retorna array com embed principal + embeds de skins (até 5 imagens)
+ */
+export function createAccountEmbeds(account: LZTAccount): EmbedBuilder[] {
+  const embeds: EmbedBuilder[] = [];
+  
+  // Embed principal com informações da conta
+  const mainEmbed = createAccountEmbed(account);
+  embeds.push(mainEmbed);
+
+  // Criar embeds adicionais para skins com imagens (máximo 5 para não exceder limite do Discord)
+  if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
+    const skins = account.account_info.weapon_skins;
+    const skinsWithImages = skins.filter(skin => skin.image_url);
+    
+    // Criar até 5 embeds adicionais com imagens de skins
+    const maxSkinEmbeds = Math.min(5, skinsWithImages.length);
+    
+    for (let i = 0; i < maxSkinEmbeds; i++) {
+      const skin = skinsWithImages[i];
+      const skinEmbed = new EmbedBuilder()
+        .setTitle(`🔫 ${skin.name}`)
+        .setImage(skin.image_url || null)
+        .setColor(0x5865F2);
+      
+      if (skin.rarity) {
+        const rarityEmoji = getRarityEmoji(skin.rarity);
+        skinEmbed.setDescription(`${rarityEmoji} Raridade: **${skin.rarity}**`);
+      }
+      
+      embeds.push(skinEmbed);
+    }
+    
+    // Se houver mais skins sem imagens ou além do limite, criar um embed final com lista
+    if (skins.length > maxSkinEmbeds) {
+      const remainingSkins = skins.slice(maxSkinEmbeds);
+      const remainingText = remainingSkins
+        .slice(0, 10)
+        .map(skin => {
+          const rarityEmoji = getRarityEmoji(skin.rarity);
+          return `${rarityEmoji} ${skin.name}`;
+        })
+        .join('\n');
+      
+      const remainingCount = skins.length - maxSkinEmbeds;
+      const moreText = remainingCount > 10 ? `\n\n*... e mais ${remainingCount - 10} skin(s)*` : '';
+      
+      const remainingEmbed = new EmbedBuilder()
+        .setTitle('🔫 Outras Skins')
+        .setDescription(remainingText + moreText)
+        .setColor(0x5865F2);
+      
+      embeds.push(remainingEmbed);
+    }
+  }
+
+  return embeds;
+}
+
+function getRarityEmoji(rarity?: string): string {
+  if (!rarity) return '🔫';
+  
+  const rarityLower = rarity.toLowerCase();
+  if (rarityLower.includes('exclusive') || rarityLower.includes('ultra')) return '💎';
+  if (rarityLower.includes('premium') || rarityLower.includes('deluxe')) return '💜';
+  if (rarityLower.includes('select') || rarityLower.includes('superior')) return '💙';
+  if (rarityLower.includes('standard') || rarityLower.includes('normal')) return '💚';
+  
+  return '🔫';
 }
 
 export function createAccountsListEmbed(

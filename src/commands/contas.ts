@@ -9,7 +9,7 @@ import {
   TextChannel,
 } from 'discord.js';
 import { LZTService } from '../services/lztService';
-import { createAccountsListEmbed, createAccountEmbed } from '../utils/embedBuilder';
+import { createAccountsListEmbed, createAccountEmbed, createAccountEmbeds } from '../utils/embedBuilder';
 import { logger } from '../utils/logger';
 import { LZTSearchFilters } from '../types/lzt';
 
@@ -111,10 +111,11 @@ async function renderAccountsList(
       
       try {
         
-        logger.info(`Criando embed para conta ${account.item_id}...`);
-        const embed = createAccountEmbed(account);
+        logger.info(`Criando embeds para conta ${account.item_id}...`);
+        const embeds = createAccountEmbeds(account);
 
-        embed.setFooter({
+        // Adicionar footer no primeiro embed (principal)
+        embeds[0].setFooter({
           text: `Código de Identificação: HYPE_${account.item_id.toString().padStart(6, '0')}`,
         });
 
@@ -136,9 +137,9 @@ async function renderAccountsList(
             .setStyle(ButtonStyle.Secondary)
         );
 
-        logger.info(`Enviando mensagem para conta ${account.item_id}...`);
+        logger.info(`Enviando mensagem com ${embeds.length} embed(s) para conta ${account.item_id}...`);
         await channel.send({
-          embeds: [embed],
+          embeds: embeds,
           components: [actionRow],
         });
         logger.info(`✅ Conta ${account.item_id} enviada com sucesso`);

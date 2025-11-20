@@ -6,7 +6,7 @@ import {
   ButtonStyle,
 } from 'discord.js';
 import { LZTService } from '../services/lztService';
-import { createAccountEmbed } from '../utils/embedBuilder';
+import { createAccountEmbeds } from '../utils/embedBuilder';
 import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
@@ -30,7 +30,7 @@ export async function execute(
 
     const account = await lztService.getAccountDetails(itemId);
 
-    const embed = createAccountEmbed(account);
+    const embeds = createAccountEmbeds(account);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
@@ -48,7 +48,7 @@ export async function execute(
     );
 
     await interaction.editReply({
-      embeds: [embed],
+      embeds: embeds,
       components: [row],
     });
   } catch (error: any) {

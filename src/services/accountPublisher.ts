@@ -1,7 +1,7 @@
 import { TextChannel, Client } from 'discord.js';
 import { LZTService } from './lztService';
 import { LZTSearchFilters } from '../types/lzt';
-import { createAccountEmbed } from '../utils/embedBuilder';
+import { createAccountEmbeds } from '../utils/embedBuilder';
 import { publishedAccountsStorage } from '../storage/publishedAccounts';
 import { logger } from '../utils/logger';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
@@ -137,8 +137,10 @@ export class AccountPublisher {
       // Publicar cada conta
       for (const account of newAccounts) {
         try {
-          const embed = createAccountEmbed(account);
-          embed.setFooter({
+          const embeds = createAccountEmbeds(account);
+          
+          // Adicionar footer no primeiro embed (principal)
+          embeds[0].setFooter({
             text: `Código de Identificação: HYPE_${account.item_id.toString().padStart(6, '0')}`,
           });
 
@@ -160,7 +162,7 @@ export class AccountPublisher {
           );
 
           const message = await channel.send({
-            embeds: [embed],
+            embeds: embeds,
             components: [actionRow],
           });
 
