@@ -27,12 +27,6 @@ export const data = new SlashCommandBuilder()
         { name: 'Iniciar', value: 'start' },
         { name: 'Parar', value: 'stop' }
       )
-  )
-  .addStringOption(option =>
-    option
-      .setName('canal')
-      .setDescription('ID do canal onde publicar (obrigatório para "start")')
-      .setRequired(false)
   );
 
 export async function execute(
@@ -48,12 +42,14 @@ export async function execute(
   }
 
   const action = interaction.options.getString('action', true);
-  const channelId = interaction.options.getString('canal');
 
   if (action === 'start') {
+    // Usar o canal onde o comando foi executado
+    const channelId = interaction.channelId;
+
     if (!channelId) {
       await interaction.reply({
-        content: '❌ **Canal obrigatório**\n\nVocê precisa informar o ID do canal onde as contas serão publicadas.\n\n**Exemplo:** `/generate action:start canal:123456789012345678`',
+        content: '❌ **Erro**\n\nNão foi possível identificar o canal. Execute o comando em um canal de texto.',
         ephemeral: true,
       });
       return;
@@ -62,6 +58,16 @@ export async function execute(
     if (!client) {
       await interaction.reply({
         content: '❌ Cliente Discord não disponível.',
+        ephemeral: true,
+      });
+      return;
+    }
+
+    // Verificar se o canal é um TextChannel
+    const channel = await client.channels.fetch(channelId);
+    if (!channel || !channel.isTextBased()) {
+      await interaction.reply({
+        content: '❌ **Erro**\n\nO canal precisa ser um canal de texto.',
         ephemeral: true,
       });
       return;

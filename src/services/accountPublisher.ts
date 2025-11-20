@@ -69,6 +69,12 @@ export class AccountPublisher {
   }
 
   private async publishNewAccounts(): Promise<void> {
+    // Verificar se ainda está rodando antes de executar
+    if (!this.isRunning) {
+      logger.info('Publicação automática foi parada, cancelando execução...');
+      return;
+    }
+
     if (!this.client || !this.channelId) {
       logger.error('Publicação automática: cliente ou canal não configurado');
       return;
@@ -136,6 +142,12 @@ export class AccountPublisher {
 
       // Publicar cada conta
       for (const account of newAccounts) {
+        // Verificar novamente se ainda está rodando antes de cada publicação
+        if (!this.isRunning) {
+          logger.info('Publicação automática foi parada durante o loop de publicações');
+          break;
+        }
+
         try {
           const embeds = await createAccountEmbeds(account, this.lztService);
           
