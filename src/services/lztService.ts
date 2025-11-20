@@ -2,6 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { lztRateLimiter } from '../utils/rateLimiter';
 import { handleLZTError } from '../utils/errorHandler';
 import { logger } from '../utils/logger';
+import { ImageUploadService } from './imageUploadService';
 import {
   LZTAccount,
   LZTSearchFilters,
@@ -14,10 +15,12 @@ export class LZTService {
   private client: AxiosInstance;
   private baseURL: string;
   private token: string;
+  private imageUploadService: ImageUploadService;
 
   constructor(token: string, baseURL: string = 'https://prod-api.lzt.market') {
     this.token = token;
     this.baseURL = baseURL;
+    this.imageUploadService = new ImageUploadService();
 
     this.client = axios.create({
       baseURL: this.baseURL,
@@ -142,10 +145,15 @@ export class LZTService {
           
           // Verificar se tem base64
           if (parsedItem.base64) {
-            // Converter Base64 para data URL que o Discord aceita
-            const dataUrl = `data:image/png;base64,${parsedItem.base64}`;
-            logger.info(`[DEBUG] ✅ Imagem Base64 encontrada e convertida para data URL`);
-            return { image: dataUrl };
+            // Converter Base64 para URL HTTP usando serviço de upload
+            logger.info(`[DEBUG] Tentando fazer upload do Base64 para obter URL HTTP...`);
+            const httpUrl = await this.imageUploadService.convertBase64ToUrl(parsedItem.base64);
+            if (httpUrl) {
+              logger.info(`[DEBUG] ✅ Imagem Base64 convertida para URL HTTP: ${httpUrl.substring(0, 50)}...`);
+              return { image: httpUrl };
+            } else {
+              logger.warn(`[DEBUG] ⚠️ Não foi possível converter Base64 para URL HTTP`);
+            }
           }
           
           // Se tiver campo image ou url
@@ -164,9 +172,12 @@ export class LZTService {
       if (typeof response.body === 'string') {
         // Verificar se é Base64 (começa com iVBORw0KGgo...)
         if (response.body.startsWith('iVBORw0KGgo') || response.body.length > 1000) {
-          const dataUrl = `data:image/png;base64,${response.body}`;
-          logger.info(`[DEBUG] ✅ String Base64 detectada e convertida para data URL`);
-          return { image: dataUrl };
+          logger.info(`[DEBUG] String Base64 detectada, tentando converter para URL HTTP...`);
+          const httpUrl = await this.imageUploadService.convertBase64ToUrl(response.body);
+          if (httpUrl) {
+            logger.info(`[DEBUG] ✅ String Base64 convertida para URL HTTP`);
+            return { image: httpUrl };
+          }
         }
         // Se for URL direta
         return { image: response.body };
@@ -176,18 +187,24 @@ export class LZTService {
       if (response.body?.image) {
         // Verificar se image é Base64
         if (typeof response.body.image === 'string' && (response.body.image.startsWith('iVBORw0KGgo') || response.body.image.length > 1000)) {
-          const dataUrl = `data:image/png;base64,${response.body.image}`;
-          logger.info(`[DEBUG] ✅ Campo image contém Base64, convertido para data URL`);
-          return { image: dataUrl };
+          logger.info(`[DEBUG] Campo image contém Base64, tentando converter para URL HTTP...`);
+          const httpUrl = await this.imageUploadService.convertBase64ToUrl(response.body.image);
+          if (httpUrl) {
+            logger.info(`[DEBUG] ✅ Campo image Base64 convertido para URL HTTP`);
+            return { image: httpUrl };
+          }
         }
         return { image: response.body.image };
       }
       
       // Se retornar objeto com campo 'base64'
       if (response.body?.base64) {
-        const dataUrl = `data:image/png;base64,${response.body.base64}`;
-        logger.info(`[DEBUG] ✅ Campo base64 encontrado, convertido para data URL`);
-        return { image: dataUrl };
+        logger.info(`[DEBUG] Campo base64 encontrado, tentando converter para URL HTTP...`);
+        const httpUrl = await this.imageUploadService.convertBase64ToUrl(response.body.base64);
+        if (httpUrl) {
+          logger.info(`[DEBUG] ✅ Campo base64 convertido para URL HTTP`);
+          return { image: httpUrl };
+        }
       }
       
       // Se retornar array de imagens
