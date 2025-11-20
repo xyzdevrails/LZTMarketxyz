@@ -106,6 +106,23 @@ export class LZTService {
     return response.body;
   }
 
+  async getAccountImages(itemId: number, type: 'skins' | 'pickaxes' | 'dances' | 'gliders' | 'weapons' | 'agents' | 'buddies' = 'skins'): Promise<{ images: string[] }> {
+    logger.info(`Buscando imagens da conta ${itemId} (tipo: ${type})`);
+
+    try {
+      const response = await this.request<{ images: string[] }>({
+        method: 'GET',
+        url: `/${itemId}/image`,
+        params: { type },
+      });
+
+      return response.body;
+    } catch (error: any) {
+      logger.error(`Erro ao buscar imagens da conta ${itemId}:`, error);
+      return { images: [] };
+    }
+  }
+
   async bulkGetAccounts(itemIds: number[]): Promise<LZTAccount[]> {
     logger.info(`Buscando ${itemIds.length} contas em bulk`);
 

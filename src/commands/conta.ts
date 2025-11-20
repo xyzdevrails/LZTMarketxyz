@@ -47,7 +47,7 @@ export async function execute(
       }, null, 2));
     }
 
-    const embeds = createAccountEmbeds(account);
+    const embeds = await createAccountEmbeds(account, lztService);
 
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()

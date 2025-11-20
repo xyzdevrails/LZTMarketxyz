@@ -112,7 +112,7 @@ async function renderAccountsList(
       try {
         
         logger.info(`Criando embeds para conta ${account.item_id}...`);
-        const embeds = createAccountEmbeds(account);
+        const embeds = await createAccountEmbeds(account, lztService);
 
         // Adicionar footer no primeiro embed (principal)
         embeds[0].setFooter({

@@ -195,8 +195,12 @@ export function createAccountEmbed(account: LZTAccount): EmbedBuilder {
 /**
  * Cria múltiplos embeds para uma conta, permitindo mostrar várias imagens de skins
  * Retorna array com embed principal + embeds de skins (até 5 imagens)
+ * Agora busca imagens através do endpoint /image da API LZT
  */
-export function createAccountEmbeds(account: LZTAccount): EmbedBuilder[] {
+export async function createAccountEmbeds(
+  account: LZTAccount,
+  lztService?: any
+): Promise<EmbedBuilder[]> {
   const embeds: EmbedBuilder[] = [];
   
   // Embed principal com informações da conta (sempre retornar pelo menos este)
@@ -222,34 +226,45 @@ export function createAccountEmbeds(account: LZTAccount): EmbedBuilder[] {
     logger.info(`[DEBUG] Primeira skin:`, JSON.stringify(account.account_info.weapon_skins[0], null, 2));
   }
 
+  // Buscar imagens das skins através do endpoint /image da API LZT
+  let skinImages: string[] = [];
+  if (lztService && account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
+    try {
+      logger.info(`[DEBUG] Buscando imagens das skins para conta ${account.item_id}`);
+      const imagesResponse = await lztService.getAccountImages(account.item_id, 'skins');
+      skinImages = imagesResponse.images || [];
+      logger.info(`[DEBUG] ${skinImages.length} imagem(ns) de skins encontrada(s)`);
+    } catch (error: any) {
+      logger.error(`[DEBUG] Erro ao buscar imagens das skins:`, error);
+    }
+  }
+
   // Criar embeds adicionais para skins com imagens (máximo 5 para não exceder limite do Discord)
   if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
     const skins = account.account_info.weapon_skins;
     logger.info(`[DEBUG] Total de skins encontradas: ${skins.length}`);
     
-    const skinsWithImages = skins.filter(skin => {
-      const hasImage = skin.image_url && skin.image_url.trim() !== '';
-      if (!hasImage) {
-        logger.info(`[DEBUG] Skin "${skin.name}" não tem image_url válida`);
-      }
-      return hasImage;
-    });
-    
-    logger.info(`[DEBUG] Skins com imagens válidas: ${skinsWithImages.length}`);
-    
-    // Criar até 5 embeds adicionais com imagens de skins
-    const maxSkinEmbeds = Math.min(5, skinsWithImages.length);
+    // Usar imagens do endpoint /image se disponíveis, senão usar image_url das skins
+    const maxSkinEmbeds = Math.min(5, Math.max(skins.length, skinImages.length));
     
     for (let i = 0; i < maxSkinEmbeds; i++) {
-      const skin = skinsWithImages[i];
-      if (!skin.image_url || skin.image_url.trim() === '') continue;
+      const skin = skins[i];
+      if (!skin) continue;
+      
+      // Priorizar imagem do endpoint /image, senão usar image_url da skin
+      const imageUrl = skinImages[i] || skin.image_url;
+      
+      if (!imageUrl || imageUrl.trim() === '') {
+        logger.info(`[DEBUG] Skin "${skin.name}" não tem imagem disponível`);
+        continue;
+      }
       
       try {
-        logger.info(`[DEBUG] Criando embed para skin "${skin.name}" com imagem: ${skin.image_url}`);
+        logger.info(`[DEBUG] Criando embed para skin "${skin.name}" com imagem: ${imageUrl}`);
         
         const skinEmbed = new EmbedBuilder()
           .setTitle(`🔫 ${skin.name}`)
-          .setImage(skin.image_url)
+          .setImage(imageUrl)
           .setColor(0x5865F2);
         
         if (skin.rarity) {

@@ -137,7 +137,7 @@ export class AccountPublisher {
       // Publicar cada conta
       for (const account of newAccounts) {
         try {
-          const embeds = createAccountEmbeds(account);
+          const embeds = await createAccountEmbeds(account, this.lztService);
           
           // Adicionar footer no primeiro embed (principal)
           embeds[0].setFooter({
