@@ -208,6 +208,11 @@ export async function execute(
     page: 1,
     per_page: Math.min(quantidade, 20), 
     order_by: 'price_to_up',
+    // Filtros específicos de Valorant: Brasil, região BR, mínimo 3 skins, nível 20+
+    country: 'Bra',
+    valorant_region: 'BR',
+    valorant_smin: 3,
+    valorant_level_min: 20,
   };
 
   if (priceMin) {

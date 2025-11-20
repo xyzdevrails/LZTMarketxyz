@@ -125,7 +125,13 @@ export interface LZTSearchFilters {
   order_by?: 'price_to_up' | 'price_to_down' | 'pdate_to_down' | 'pdate_to_up' | 'pdate_to_down_upload' | 'pdate_to_up_upload' | 'edate_to_up' | 'edate_to_down' | 'ddate_to_up' | 'ddate_to_down';
   
   rmin?: number; 
-  rmax?: number; 
+  rmax?: number;
+  
+  // Filtros específicos de Valorant
+  country?: string | string[]; // Ex: 'Bra' ou ['Bra']
+  valorant_region?: string | string[]; // Ex: 'BR' ou ['BR']
+  valorant_smin?: number; // Mínimo de skins
+  valorant_level_min?: number; // Nível mínimo
 }
 
 export interface LZTSearchResponse {

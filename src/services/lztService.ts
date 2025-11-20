@@ -59,6 +59,22 @@ export class LZTService {
     if (filters?.rmin) params.rmin = filters.rmin;
     if (filters?.rmax) params.rmax = filters.rmax;
 
+    // Filtros específicos de Valorant
+    if (filters?.country) {
+      // A API aceita array: country[]=Bra
+      params['country[]'] = Array.isArray(filters.country) ? filters.country : [filters.country];
+    }
+    if (filters?.valorant_region) {
+      // A API aceita array: valorant_region[]=BR
+      params['valorant_region[]'] = Array.isArray(filters.valorant_region) ? filters.valorant_region : [filters.valorant_region];
+    }
+    if (filters?.valorant_smin !== undefined) {
+      params.valorant_smin = filters.valorant_smin;
+    }
+    if (filters?.valorant_level_min !== undefined) {
+      params.valorant_level_min = filters.valorant_level_min;
+    }
+
     const response = await this.request<LZTSearchResponse>({
       method: 'GET',
       url: '/riot',
