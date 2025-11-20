@@ -72,6 +72,83 @@ export async function handleButtonInteraction(
         return;
       }
 
+      // Verificar se o serviço de saldo está disponível e se o usuário tem saldo suficiente
+      if (balanceService) {
+        const userBalance = balanceService.getUserBalance(interaction.user.id);
+        const hasBalance = balanceService.hasSufficientBalance(interaction.user.id, account.price);
+
+        if (hasBalance) {
+          // Usuário tem saldo suficiente - mostrar modal de confirmação para compra com saldo
+          const order = await purchaseService.createPendingOrder(
+            itemId,
+            interaction.user,
+            account.price,
+            account.currency || 'BRL'
+          );
+
+          const modal = new ModalBuilder()
+            .setCustomId(`confirm_balance_purchase_${order.order_id}`)
+            .setTitle('Confirmar Compra com Saldo');
+
+          const confirmInput = new TextInputBuilder()
+            .setCustomId('confirm_text')
+            .setLabel('Digite "CONFIRMAR" para prosseguir')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Digite CONFIRMAR')
+            .setRequired(true)
+            .setMaxLength(10);
+
+          const row = new ActionRowBuilder<TextInputBuilder>().addComponents(confirmInput);
+          modal.addComponents(row);
+
+          await interaction.reply({
+            content: `💰 **Saldo Disponível:** R$ ${userBalance.toFixed(2)}\n` +
+                     `💵 **Preço da Conta:** R$ ${account.price.toFixed(2)}\n` +
+                     `✅ **Saldo Restante após compra:** R$ ${(userBalance - account.price).toFixed(2)}\n\n` +
+                     `Confirme a compra no modal abaixo para prosseguir.`,
+            ephemeral: true,
+          });
+
+          await interaction.showModal(modal);
+          return;
+        } else {
+          // Usuário não tem saldo suficiente - mostrar opção de adicionar saldo ou pagar manualmente
+          const order = await purchaseService.createPendingOrder(
+            itemId,
+            interaction.user,
+            account.price,
+            account.currency || 'BRL'
+          );
+
+          const modal = new ModalBuilder()
+            .setCustomId(`confirm_payment_${order.order_id}`)
+            .setTitle('Confirmar Pagamento');
+
+          const paymentInput = new TextInputBuilder()
+            .setCustomId('payment_proof')
+            .setLabel('Comprovante de Pagamento')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Cole o link do comprovante ou descreva o método de pagamento usado')
+            .setRequired(true);
+
+          const row = new ActionRowBuilder<TextInputBuilder>().addComponents(paymentInput);
+          modal.addComponents(row);
+
+          await interaction.reply({
+            content: `⚠️ **Saldo Insuficiente**\n\n` +
+                     `💰 **Seu Saldo:** R$ ${userBalance.toFixed(2)}\n` +
+                     `💵 **Preço da Conta:** R$ ${account.price.toFixed(2)}\n` +
+                     `❌ **Faltam:** R$ ${(account.price - userBalance).toFixed(2)}\n\n` +
+                     `💡 Use \`/adicionarsaldo\` para adicionar saldo ou confirme o pagamento manual no modal abaixo.`,
+            ephemeral: true,
+          });
+
+          await interaction.showModal(modal);
+          return;
+        }
+      }
+
+      // Se não há serviço de saldo disponível, usar fluxo manual
       const order = await purchaseService.createPendingOrder(
         itemId,
         interaction.user,

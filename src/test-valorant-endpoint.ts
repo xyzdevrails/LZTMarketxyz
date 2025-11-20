@@ -7,8 +7,8 @@ dotenv.config();
 async function testValorantEndpoint() {
   const token = process.env.LZT_API_TOKEN;
   const baseURLs = [
-    'https:
-    'https:
+    'https://prod-api.lzt.market',
+    'https://stage-api.lzt.market',
   ];
 
   const endpoints = [

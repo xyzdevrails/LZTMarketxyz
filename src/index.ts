@@ -322,7 +322,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
   } else if (interaction.isModalSubmit()) {
     try {
-      await handleModalInteraction(interaction, purchaseService);
+      await handleModalInteraction(interaction, purchaseService, balanceService);
     } catch (error) {
       logger.error('Erro ao processar modal', error);
       
