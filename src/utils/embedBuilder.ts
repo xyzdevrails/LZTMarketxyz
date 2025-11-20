@@ -198,34 +198,52 @@ export function createAccountEmbed(account: LZTAccount): EmbedBuilder {
 export function createAccountEmbeds(account: LZTAccount): EmbedBuilder[] {
   const embeds: EmbedBuilder[] = [];
   
-  // Embed principal com informações da conta
+  // Embed principal com informações da conta (sempre retornar pelo menos este)
   const mainEmbed = createAccountEmbed(account);
+  
+  // Garantir que o embed principal tenha pelo menos título e descrição
+  if (!mainEmbed.data.title) {
+    mainEmbed.setTitle(`🎮 ${account.title || 'Conta Valorant'}`);
+  }
+  if (!mainEmbed.data.description) {
+    mainEmbed.setDescription(`💰 **Preço: R$ ${account.price.toFixed(2)}**`);
+  }
+  
   embeds.push(mainEmbed);
 
   // Criar embeds adicionais para skins com imagens (máximo 5 para não exceder limite do Discord)
   if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
     const skins = account.account_info.weapon_skins;
-    const skinsWithImages = skins.filter(skin => skin.image_url);
+    const skinsWithImages = skins.filter(skin => skin.image_url && skin.image_url.trim() !== '');
     
     // Criar até 5 embeds adicionais com imagens de skins
     const maxSkinEmbeds = Math.min(5, skinsWithImages.length);
     
     for (let i = 0; i < maxSkinEmbeds; i++) {
       const skin = skinsWithImages[i];
-      const skinEmbed = new EmbedBuilder()
-        .setTitle(`🔫 ${skin.name}`)
-        .setImage(skin.image_url || null)
-        .setColor(0x5865F2);
+      if (!skin.image_url || skin.image_url.trim() === '') continue;
       
-      if (skin.rarity) {
-        const rarityEmoji = getRarityEmoji(skin.rarity);
-        skinEmbed.setDescription(`${rarityEmoji} Raridade: **${skin.rarity}**`);
+      try {
+        const skinEmbed = new EmbedBuilder()
+          .setTitle(`🔫 ${skin.name}`)
+          .setImage(skin.image_url)
+          .setColor(0x5865F2);
+        
+        if (skin.rarity) {
+          const rarityEmoji = getRarityEmoji(skin.rarity);
+          skinEmbed.setDescription(`${rarityEmoji} Raridade: **${skin.rarity}**`);
+        } else {
+          skinEmbed.setDescription('Skin de arma');
+        }
+        
+        embeds.push(skinEmbed);
+      } catch (error) {
+        // Se houver erro ao criar embed da skin, continuar com as próximas
+        console.error(`Erro ao criar embed para skin ${skin.name}:`, error);
       }
-      
-      embeds.push(skinEmbed);
     }
     
-    // Se houver mais skins sem imagens ou além do limite, criar um embed final com lista
+    // Se houver mais skins além das que foram mostradas com imagens, criar um embed final com lista
     if (skins.length > maxSkinEmbeds) {
       const remainingSkins = skins.slice(maxSkinEmbeds);
       const remainingText = remainingSkins
@@ -239,13 +257,20 @@ export function createAccountEmbeds(account: LZTAccount): EmbedBuilder[] {
       const remainingCount = skins.length - maxSkinEmbeds;
       const moreText = remainingCount > 10 ? `\n\n*... e mais ${remainingCount - 10} skin(s)*` : '';
       
-      const remainingEmbed = new EmbedBuilder()
-        .setTitle('🔫 Outras Skins')
-        .setDescription(remainingText + moreText)
-        .setColor(0x5865F2);
-      
-      embeds.push(remainingEmbed);
+      if (remainingText.trim() !== '') {
+        const remainingEmbed = new EmbedBuilder()
+          .setTitle('🔫 Outras Skins')
+          .setDescription(remainingText + moreText)
+          .setColor(0x5865F2);
+        
+        embeds.push(remainingEmbed);
+      }
     }
+  }
+
+  // Garantir que sempre retorne pelo menos o embed principal
+  if (embeds.length === 0) {
+    embeds.push(mainEmbed);
   }
 
   return embeds;

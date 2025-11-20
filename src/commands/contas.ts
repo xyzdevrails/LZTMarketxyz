@@ -138,10 +138,33 @@ async function renderAccountsList(
         );
 
         logger.info(`Enviando mensagem com ${embeds.length} embed(s) para conta ${account.item_id}...`);
-        await channel.send({
-          embeds: embeds,
-          components: [actionRow],
+        logger.info(`Detalhes dos embeds:`, {
+          totalEmbeds: embeds.length,
+          hasMainEmbed: embeds.length > 0,
+          skinEmbeds: embeds.length - 1,
         });
+        
+        try {
+          await channel.send({
+            embeds: embeds,
+            components: [actionRow],
+          });
+          logger.info(`✅ Mensagem enviada com sucesso para conta ${account.item_id}`);
+        } catch (sendError: any) {
+          logger.error(`Erro ao enviar mensagem para conta ${account.item_id}:`, sendError);
+          // Tentar enviar apenas o embed principal em caso de erro
+          if (embeds.length > 0) {
+            try {
+              await channel.send({
+                embeds: [embeds[0]],
+                components: [actionRow],
+              });
+              logger.info(`✅ Mensagem enviada com embed principal apenas para conta ${account.item_id}`);
+            } catch (fallbackError: any) {
+              logger.error(`Erro ao enviar embed principal:`, fallbackError);
+            }
+          }
+        }
         logger.info(`✅ Conta ${account.item_id} enviada com sucesso`);
 
         if (i < accountsToShow.length - 1) {
