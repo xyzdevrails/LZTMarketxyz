@@ -106,7 +106,7 @@ export class LZTService {
     return response.body;
   }
 
-  async getAccountImages(itemId: number, type: 'skins' | 'pickaxes' | 'dances' | 'gliders' | 'weapons' | 'agents' | 'buddies' = 'skins'): Promise<{ image?: string; images?: string[] }> {
+  async getAccountImages(itemId: number, type: 'weapons' | 'agents' | 'buddies' = 'weapons'): Promise<{ image?: string; images?: string[] }> {
     logger.info(`Buscando imagem da conta ${itemId} (tipo: ${type})`);
 
     try {

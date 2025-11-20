@@ -240,7 +240,8 @@ export async function createAccountEmbeds(
   if (lztService) {
     try {
       logger.info(`[DEBUG] Estratégia 1: Buscando imagem via endpoint /image da LZT`);
-      const imagesResponse = await lztService.getAccountImages(account.item_id, 'skins');
+      // A API LZT aceita 'weapons' (não 'skins') para skins de armas do Valorant
+      const imagesResponse = await lztService.getAccountImages(account.item_id, 'weapons');
       
       if (imagesResponse.image) {
         skinImageUrl = imagesResponse.image;
@@ -269,52 +270,68 @@ export async function createAccountEmbeds(
   }
 
   // ESTRATÉGIA 3: Usar API valorant-api.com para buscar imagens baseadas nos nomes das skins
-  if (!skinImageUrl && account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
-    try {
-      logger.info(`[DEBUG] Estratégia 3: Buscando imagens via API valorant-api.com`);
-      const valorantApi = getValorantApiService();
-      
-      // Tentar buscar imagem da primeira skin mais importante (geralmente a mais rara ou primeira da lista)
-      const skins = account.account_info.weapon_skins;
-      
-      // Ordenar por raridade (se disponível) ou usar a primeira
-      const sortedSkins = [...skins].sort((a, b) => {
-        const rarityOrder: Record<string, number> = {
-          'exclusive': 5,
-          'ultra': 4,
-          'premium': 3,
-          'deluxe': 3,
-          'select': 2,
-          'superior': 2,
-          'standard': 1,
-          'normal': 1,
-        };
+  if (!skinImageUrl) {
+    if (account.account_info?.weapon_skins && account.account_info.weapon_skins.length > 0) {
+      try {
+        logger.info(`[DEBUG] Estratégia 3: Buscando imagens via API valorant-api.com`);
+        logger.info(`[DEBUG] Total de skins disponíveis: ${account.account_info.weapon_skins.length}`);
+        logger.info(`[DEBUG] Primeiras 3 skins:`, account.account_info.weapon_skins.slice(0, 3).map(s => s.name));
         
-        const aRarity = a.rarity?.toLowerCase() || '';
-        const bRarity = b.rarity?.toLowerCase() || '';
-        const aOrder = Object.entries(rarityOrder).find(([key]) => aRarity.includes(key))?.[1] || 0;
-        const bOrder = Object.entries(rarityOrder).find(([key]) => bRarity.includes(key))?.[1] || 0;
+        const valorantApi = getValorantApiService();
         
-        return bOrder - aOrder; // Ordenar do mais raro para o menos raro
-      });
-      
-      // Tentar buscar imagem das primeiras 3 skins mais importantes
-      for (const skin of sortedSkins.slice(0, 3)) {
-        if (skin.name) {
-          const apiImageUrl = await valorantApi.getSkinImage(skin.name);
-          if (apiImageUrl) {
-            skinImageUrl = apiImageUrl;
-            logger.info(`[DEBUG] ✅ Imagem encontrada via valorant-api.com para "${skin.name}": ${skinImageUrl.substring(0, 50)}...`);
-            break; // Usar a primeira imagem encontrada
+        // Tentar buscar imagem da primeira skin mais importante (geralmente a mais rara ou primeira da lista)
+        const skins = account.account_info.weapon_skins;
+        
+        // Ordenar por raridade (se disponível) ou usar a primeira
+        const sortedSkins = [...skins].sort((a, b) => {
+          const rarityOrder: Record<string, number> = {
+            'exclusive': 5,
+            'ultra': 4,
+            'premium': 3,
+            'deluxe': 3,
+            'select': 2,
+            'superior': 2,
+            'standard': 1,
+            'normal': 1,
+          };
+          
+          const aRarity = a.rarity?.toLowerCase() || '';
+          const bRarity = b.rarity?.toLowerCase() || '';
+          const aOrder = Object.entries(rarityOrder).find(([key]) => aRarity.includes(key))?.[1] || 0;
+          const bOrder = Object.entries(rarityOrder).find(([key]) => bRarity.includes(key))?.[1] || 0;
+          
+          return bOrder - aOrder; // Ordenar do mais raro para o menos raro
+        });
+        
+        logger.info(`[DEBUG] Skins ordenadas por raridade:`, sortedSkins.slice(0, 3).map(s => `${s.name} (${s.rarity || 'N/A'})`));
+        
+        // Tentar buscar imagem das primeiras 5 skins mais importantes (aumentado de 3 para 5)
+        for (const skin of sortedSkins.slice(0, 5)) {
+          if (skin.name) {
+            logger.info(`[DEBUG] Tentando buscar imagem para skin: "${skin.name}"`);
+            const apiImageUrl = await valorantApi.getSkinImage(skin.name);
+            if (apiImageUrl) {
+              skinImageUrl = apiImageUrl;
+              logger.info(`[DEBUG] ✅ Imagem encontrada via valorant-api.com para "${skin.name}": ${skinImageUrl.substring(0, 50)}...`);
+              break; // Usar a primeira imagem encontrada
+            } else {
+              logger.info(`[DEBUG] ❌ Nenhuma imagem encontrada para "${skin.name}"`);
+            }
           }
         }
+        
+        if (!skinImageUrl) {
+          logger.warn(`[DEBUG] ❌ Nenhuma imagem encontrada via valorant-api.com para nenhuma das ${sortedSkins.length} skins disponíveis`);
+        }
+      } catch (error: any) {
+        logger.error(`[DEBUG] ❌ Erro ao buscar imagem via valorant-api.com:`, error.message);
+        logger.error(`[DEBUG] Stack trace:`, error.stack);
       }
-      
-      if (!skinImageUrl) {
-        logger.warn(`[DEBUG] ❌ Nenhuma imagem encontrada via valorant-api.com para as skins disponíveis`);
-      }
-    } catch (error: any) {
-      logger.error(`[DEBUG] ❌ Erro ao buscar imagem via valorant-api.com:`, error.message);
+    } else {
+      logger.warn(`[DEBUG] Estratégia 3: Não executada - account_info.weapon_skins não disponível ou vazio`);
+      logger.info(`[DEBUG] account_info existe? ${!!account.account_info}`);
+      logger.info(`[DEBUG] weapon_skins existe? ${!!account.account_info?.weapon_skins}`);
+      logger.info(`[DEBUG] weapon_skins length: ${account.account_info?.weapon_skins?.length || 0}`);
     }
   }
 
