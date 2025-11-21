@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { lztRateLimiter } from '../utils/rateLimiter';
-import { handleLZTError } from '../utils/errorHandler';
+import { LZTAPIError, handleLZTError } from '../utils/errorHandler';
 import { logger } from '../utils/logger';
 import { ImageUploadService } from './imageUploadService';
 import {
@@ -101,12 +101,32 @@ export class LZTService {
   async getAccountDetails(itemId: number): Promise<LZTAccount> {
     logger.info(`Buscando detalhes da conta ${itemId}`);
 
-    const response = await this.request<LZTAccount>({
-      method: 'GET',
-      url: `/market/${itemId}`,
-    });
+    try {
+      const response = await this.request<LZTAccount>({
+        method: 'GET',
+        url: `/market/${itemId}`,
+      });
 
-    return response.body;
+      return response.body;
+    } catch (error: any) {
+      // Algumas contas retornam 404 no endpoint padrão, mesmo estando disponíveis no site.
+      // Como fallback, tentamos obter os dados via bulk-get (que retorna informações completas).
+      if (error instanceof LZTAPIError && error.statusCode === 404) {
+        logger.warn(`[LZTService] Conta ${itemId} retornou 404 no endpoint padrão. Tentando bulk-get...`);
+        try {
+          const bulkResult = await this.bulkGetAccounts([itemId]);
+          if (bulkResult.length > 0) {
+            logger.info(`[LZTService] ✅ Detalhes da conta ${itemId} obtidos via bulk-get`);
+            return bulkResult[0];
+          }
+          logger.warn(`[LZTService] ⚠️ Bulk-get não retornou dados para a conta ${itemId}`);
+        } catch (bulkError: any) {
+          logger.error(`[LZTService] ❌ Erro ao tentar bulk-get para conta ${itemId}:`, bulkError.message);
+        }
+      }
+
+      throw error;
+    }
   }
 
   async getAccountImages(itemId: number, type?: 'weapons' | 'agents' | 'buddies'): Promise<{ image?: string; images?: string[] }> {
@@ -122,7 +142,7 @@ export class LZTService {
       // O endpoint /image pode retornar uma única URL de imagem ou um objeto com image/images
       const response = await this.request<any>({
         method: 'GET',
-        url: `/${itemId}/image`,
+        url: `/market/${itemId}/image`,
         params: Object.keys(params).length > 0 ? params : undefined,
       });
 
