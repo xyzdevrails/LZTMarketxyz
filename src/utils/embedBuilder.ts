@@ -229,7 +229,12 @@ export async function createAccountEmbeds(
       logger.info(`[DEBUG] weapon_skins existe? ${!!accountWithDetails.account_info?.weapon_skins}`);
       logger.info(`[DEBUG] weapon_skins length: ${accountWithDetails.account_info?.weapon_skins?.length || 0}`);
     } catch (error: any) {
-      logger.warn(`[DEBUG] ⚠️ Erro ao buscar detalhes completos da conta:`, error.message);
+      // Se for 404, a conta não existe mais ou não está disponível
+      if (error.statusCode === 404) {
+        logger.warn(`[DEBUG] ⚠️ Conta ${account.item_id} não encontrada (404) - pode ter sido vendida ou removida`);
+      } else {
+        logger.warn(`[DEBUG] ⚠️ Erro ao buscar detalhes completos da conta ${account.item_id}:`, error.message);
+      }
       // Continuar com os dados originais se falhar
       accountWithDetails = account;
     }
@@ -468,7 +473,14 @@ export async function generateSkinsGridEmbed(
         logger.info(`[SkinsGridEmbed] Buscando detalhes completos da conta ${account.item_id}...`);
         accountWithDetails = await lztService.getAccountDetails(account.item_id);
       } catch (error: any) {
-        logger.warn(`[SkinsGridEmbed] Erro ao buscar detalhes: ${error.message}`);
+        // Se for 404, a conta não existe mais
+        if (error.statusCode === 404) {
+          logger.warn(`[SkinsGridEmbed] Conta ${account.item_id} não encontrada (404) - pode ter sido vendida ou removida`);
+        } else {
+          logger.warn(`[SkinsGridEmbed] Erro ao buscar detalhes da conta ${account.item_id}: ${error.message}`);
+        }
+        // Continuar com dados originais
+        accountWithDetails = account;
       }
     }
 

@@ -33,6 +33,9 @@ export function handleLZTError(error: any): LZTAPIError {
       case 403:
         message = 'Sem permissão para acessar este recurso';
         break;
+      case 404:
+        message = 'Conta não encontrada ou não disponível';
+        break;
       case 429:
         message = 'Rate limit excedido. Aguarde um momento.';
         break;
