@@ -368,6 +368,27 @@ export async function createAccountEmbeds(
     }
   }
 
+  // ESTRATÉGIA 3: Usar endpoint de imagens direto da LZT (/market/{id}/image)
+  if (!skinImageUrl && lztService) {
+    try {
+      logger.info(`[DEBUG] Estratégia 4: Buscando imagem via endpoint /market/{id}/image da LZT`);
+      const imageResult = await lztService.getAccountImages(accountWithDetails.item_id, 'weapons');
+
+      const imageFromLZT = imageResult?.image || (imageResult?.images && imageResult.images.length > 0 ? imageResult.images[0] : null);
+
+      if (imageFromLZT) {
+        skinImageUrl = imageFromLZT;
+        logger.info(`[DEBUG] ✅ Imagem obtida via LZT /image: ${skinImageUrl.substring(0, 50)}...`);
+      } else {
+        logger.warn(`[DEBUG] ⚠️ Endpoint /image não retornou nenhuma imagem utilizável`);
+      }
+    } catch (error: any) {
+      logger.error(`[DEBUG] ❌ Erro ao buscar imagem via endpoint /image da LZT:`, error.message || error);
+    }
+  } else if (!skinImageUrl) {
+    logger.warn(`[DEBUG] ⚠️ Estratégia 4 não executada - lztService não disponível`);
+  }
+
   // Adicionar imagem ao embed se encontrada
   if (skinImageUrl) {
     logger.info(`[DEBUG] ✅ Adicionando imagem ao embed principal`);
