@@ -208,9 +208,8 @@ function getValorantApiService(): ValorantApiService {
 /**
  * Cria embeds para uma conta, usando múltiplas estratégias para obter imagens de skins:
  * 1. Grid de skins gerado (quando cacheService disponível) - PRIORIDADE ALTA
- * 2. Endpoint /image da API LZT (grid único com todas as skins) - FALLBACK 1
- * 3. image_url das skins individuais da LZT - FALLBACK 2
- * 4. API valorant-api.com baseada nos nomes das skins - FALLBACK 3
+ * 2. image_url das skins individuais da LZT - FALLBACK 1
+ * 3. API valorant-api.com baseada nos nomes das skins - FALLBACK 2
  */
 export async function createAccountEmbeds(
   account: LZTAccount,
@@ -237,23 +236,33 @@ export async function createAccountEmbeds(
   }
 
   // ESTRATÉGIA 0: Tentar gerar grid de skins (PRIORIDADE MÁXIMA)
+  logger.info(`[DEBUG] Verificando condições para grid: cacheService=${!!cacheService}, weapon_skins=${!!accountWithDetails.account_info?.weapon_skins}, length=${accountWithDetails.account_info?.weapon_skins?.length || 0}`);
+  
   if (cacheService && accountWithDetails.account_info?.weapon_skins && accountWithDetails.account_info.weapon_skins.length > 0) {
     try {
-      logger.info(`[DEBUG] Tentando gerar grid de skins para conta ${accountWithDetails.item_id}...`);
+      logger.info(`[DEBUG] ✅ Condições atendidas! Tentando gerar grid de skins para conta ${accountWithDetails.item_id}...`);
       const gridResult = await generateSkinsGridEmbed(accountWithDetails, cacheService, lztService);
       
       if (gridResult) {
-        logger.info(`[DEBUG] ✅ Grid de skins gerado com sucesso!`);
+        logger.info(`[DEBUG] ✅ Grid de skins gerado com sucesso! Retornando grid com ${gridResult.files.length} arquivo(s)`);
         return {
           embeds: [gridResult.embed],
           files: gridResult.files,
         };
       } else {
-        logger.info(`[DEBUG] ⚠️ Grid não pôde ser gerado, usando fallback...`);
+        logger.warn(`[DEBUG] ⚠️ Grid não pôde ser gerado (retornou null), usando fallback...`);
       }
     } catch (error: any) {
-      logger.warn(`[DEBUG] ⚠️ Erro ao gerar grid de skins: ${error.message}`);
+      logger.error(`[DEBUG] ❌ Erro ao gerar grid de skins: ${error.message}`);
+      logger.error(`[DEBUG] Stack: ${error.stack}`);
       logger.warn(`[DEBUG] Continuando com estratégias de fallback...`);
+    }
+  } else {
+    if (!cacheService) {
+      logger.info(`[DEBUG] ⚠️ cacheService não disponível, pulando grid`);
+    }
+    if (!accountWithDetails.account_info?.weapon_skins || accountWithDetails.account_info.weapon_skins.length === 0) {
+      logger.info(`[DEBUG] ⚠️ Nenhuma skin disponível (weapon_skins=${!!accountWithDetails.account_info?.weapon_skins}, length=${accountWithDetails.account_info?.weapon_skins?.length || 0}), pulando grid`);
     }
   }
   
@@ -278,41 +287,7 @@ export async function createAccountEmbeds(
 
   let skinImageUrl: string | null = null;
 
-      // ESTRATÉGIA 1: Tentar endpoint /image da API LZT (grid único)
-      // NOTA: Este endpoint pode não funcionar para todas as contas ou pode não existir
-      // Por isso, não é crítico se falhar - temos fallbacks nas estratégias 2 e 3
-      if (lztService) {
-        try {
-          logger.info(`[DEBUG] Estratégia 1: Buscando imagem via endpoint /image da LZT`);
-          // Tentar primeiro sem tipo, depois com 'weapons' se necessário
-          let imagesResponse = await lztService.getAccountImages(accountWithDetails.item_id);
-      
-          // Se não retornar nada, tentar com 'weapons'
-          if (!imagesResponse.image && (!imagesResponse.images || imagesResponse.images.length === 0)) {
-            logger.info(`[DEBUG] Tentando novamente com type='weapons'`);
-            imagesResponse = await lztService.getAccountImages(accountWithDetails.item_id, 'weapons');
-          }
-      
-      if (imagesResponse.image) {
-        skinImageUrl = imagesResponse.image;
-        if (skinImageUrl) {
-          logger.info(`[DEBUG] ✅ Imagem encontrada via endpoint /image: ${skinImageUrl.substring(0, 50)}...`);
-        }
-      } else if (imagesResponse.images && imagesResponse.images.length > 0) {
-        skinImageUrl = imagesResponse.images[0] || null;
-        if (skinImageUrl) {
-          logger.info(`[DEBUG] ✅ Imagem encontrada via endpoint /image (array): ${skinImageUrl.substring(0, 50)}...`);
-        }
-      } else {
-        logger.info(`[DEBUG] ⚠️ Endpoint /image não retornou imagens (isso é normal se o endpoint não existir ou não funcionar para esta conta)`);
-      }
-    } catch (error: any) {
-      // Não é crítico - o endpoint pode não existir ou não funcionar para todas as contas
-      logger.info(`[DEBUG] ⚠️ Endpoint /image não disponível ou retornou erro (isso é esperado):`, error.message);
-    }
-  }
-
-  // ESTRATÉGIA 2: Usar image_url das skins individuais (se disponível)
+  // ESTRATÉGIA 1: Usar image_url das skins individuais (se disponível)
   if (!skinImageUrl && accountWithDetails.account_info?.weapon_skins && accountWithDetails.account_info.weapon_skins.length > 0) {
     logger.info(`[DEBUG] Estratégia 2: Tentando usar image_url das skins individuais`);
     const firstSkinWithImage = accountWithDetails.account_info.weapon_skins.find(skin => skin.image_url);
@@ -322,7 +297,7 @@ export async function createAccountEmbeds(
     }
   }
 
-  // ESTRATÉGIA 3: Usar API valorant-api.com para buscar imagens baseadas nos nomes das skins
+  // ESTRATÉGIA 2: Usar API valorant-api.com para buscar imagens baseadas nos nomes das skins
   if (!skinImageUrl) {
     if (accountWithDetails.account_info?.weapon_skins && accountWithDetails.account_info.weapon_skins.length > 0) {
       try {

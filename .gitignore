@@ -29,6 +29,9 @@ pix_transactions.json
 published_accounts.json
 purchase_logs.json
 
+# Cache files (apenas dados JSON, não imagens)
+cache/valorant-skins.json
+
 # Certificates and sensitive files
 *.p12
 *.crt

@@ -1,7 +1,4 @@
-import { createCanvas, loadImage, CanvasRenderingContext2D } from 'canvas';
-import axios from 'axios';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { createCanvas, loadImage } from 'canvas';
 import { logger } from './logger';
 import { SkinsCacheService } from '../services/skinsCacheService';
 
@@ -13,9 +10,8 @@ interface SkinData {
 
 interface GridSkinInfo {
   name: string;
-  imagePath: string;
+  imageUrl: string;
   rarity: 'Select' | 'Deluxe' | 'Premium' | 'Exclusive' | 'Ultra' | 'Unknown';
-  displayIcon: string;
 }
 
 // Cores das bordas por raridade
@@ -47,80 +43,9 @@ const BACKGROUND_COLOR = '#1E1E23'; // RGB(30, 30, 35)
 
 export class SkinsGridGenerator {
   private cacheService: SkinsCacheService;
-  private skinsCacheDir: string;
 
   constructor(cacheService: SkinsCacheService) {
     this.cacheService = cacheService;
-    this.skinsCacheDir = path.join(process.cwd(), 'cache', 'skins');
-  }
-
-  /**
-   * Garante que o diretório de cache de imagens existe
-   */
-  private async ensureCacheDirectory(): Promise<void> {
-    try {
-      await fs.access(this.skinsCacheDir);
-    } catch {
-      await fs.mkdir(this.skinsCacheDir, { recursive: true });
-      logger.info(`[SkinsGrid] Diretório de cache de imagens criado: ${this.skinsCacheDir}`);
-    }
-  }
-
-  /**
-   * Normaliza nome da skin para nome de arquivo
-   */
-  private normalizeFileName(name: string): string {
-    return name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
-      .replace(/[^a-z0-9\s]/g, '') // Remove caracteres especiais
-      .replace(/\s+/g, '-') // Substitui espaços por hífens
-      .trim();
-  }
-
-  /**
-   * Retorna caminho da imagem em cache
-   */
-  private getCachedImagePath(skinName: string): string {
-    const fileName = `${this.normalizeFileName(skinName)}.png`;
-    return path.join(this.skinsCacheDir, fileName);
-  }
-
-  /**
-   * Baixa imagem da skin com cache em disco
-   */
-  async downloadSkinWithCache(url: string, skinName: string): Promise<string | null> {
-    try {
-      await this.ensureCacheDirectory();
-      
-      const cachedPath = this.getCachedImagePath(skinName);
-      
-      // Verificar se já existe em cache
-      try {
-        await fs.access(cachedPath);
-        logger.info(`[SkinsGrid] Imagem encontrada em cache: ${skinName}`);
-        return cachedPath;
-      } catch {
-        // Não existe em cache, precisa baixar
-      }
-
-      // Baixar imagem
-      logger.info(`[SkinsGrid] Baixando imagem: ${skinName} de ${url.substring(0, 50)}...`);
-      const response = await axios.get(url, {
-        responseType: 'arraybuffer',
-        timeout: 10000, // 10 segundos
-      });
-
-      // Salvar em cache
-      await fs.writeFile(cachedPath, response.data);
-      logger.info(`[SkinsGrid] ✅ Imagem salva em cache: ${cachedPath}`);
-
-      return cachedPath;
-    } catch (error: any) {
-      logger.warn(`[SkinsGrid] ⚠️ Erro ao baixar imagem de ${skinName}: ${error.message}`);
-      return null;
-    }
   }
 
   /**
@@ -137,6 +62,41 @@ export class SkinsGridGenerator {
     if (rarityLower.includes('select')) return 'Select';
     
     return 'Unknown';
+  }
+
+  /**
+   * Carrega imagem com retry em caso de falha
+   */
+  private async loadImageWithRetry(
+    imageUrl: string,
+    skinName: string,
+    maxRetries: number = 3
+  ): Promise<any> {
+    let lastError: any = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        logger.info(`[SkinsGrid] Tentativa ${attempt}/${maxRetries} de carregar imagem para ${skinName}...`);
+        logger.info(`[SkinsGrid] URL: ${imageUrl.substring(0, 80)}...`);
+        
+        const image = await loadImage(imageUrl);
+        logger.info(`[SkinsGrid] ✅ Imagem carregada com sucesso na tentativa ${attempt}`);
+        return image;
+      } catch (error: any) {
+        lastError = error;
+        logger.warn(`[SkinsGrid] ⚠️ Tentativa ${attempt} falhou: ${error.message}`);
+        
+        // Se não for a última tentativa, esperar um pouco antes de tentar novamente
+        if (attempt < maxRetries) {
+          const waitTime = attempt * 500; // 500ms, 1000ms, 1500ms...
+          logger.info(`[SkinsGrid] Aguardando ${waitTime}ms antes da próxima tentativa...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+    
+    logger.error(`[SkinsGrid] ❌ Falhou ao carregar imagem após ${maxRetries} tentativas: ${lastError?.message}`);
+    return null;
   }
 
   /**
@@ -158,31 +118,49 @@ export class SkinsGridGenerator {
 
   /**
    * Processa lista de skins da conta e busca informações completas
+   * Estratégia de busca de imagem (em ordem de prioridade):
+   * 1. image_url da LZT (se disponível)
+   * 2. Busca no cache pelo nome da skin
+   * 3. Tenta buscar no cache com nome normalizado
    */
-  private async processSkins(skins: SkinData[]): Promise<GridSkinInfo[]> {
+  private processSkins(skins: SkinData[]): GridSkinInfo[] {
     const processedSkins: GridSkinInfo[] = [];
 
     for (const skin of skins) {
       try {
-        // Buscar informações da skin no cache
-        const skinInfo = this.cacheService.getSkinInfo(skin.name);
-        
-        if (skinInfo) {
-          // Baixar imagem com cache
-          const imagePath = await this.downloadSkinWithCache(skinInfo.displayIcon, skin.name);
+        let imageUrl: string | null = null;
+        let displayName = skin.name;
+        let rarity: GridSkinInfo['rarity'] = this.mapRarity(skin.rarity);
+
+        // ESTRATÉGIA 1: Usar image_url da LZT (prioridade máxima)
+        if (skin.imageUrl) {
+          imageUrl = skin.imageUrl;
+          logger.info(`[SkinsGrid] ✅ Usando image_url da LZT para: ${skin.name}`);
+        }
+
+        // ESTRATÉGIA 2: Buscar no cache pelo nome
+        if (!imageUrl) {
+          const skinInfo = this.cacheService.getSkinInfo(skin.name);
           
-          if (imagePath) {
-            processedSkins.push({
-              name: skinInfo.displayName,
-              imagePath: imagePath,
-              rarity: skinInfo.rarity,
-              displayIcon: skinInfo.displayIcon,
-            });
+          if (skinInfo && skinInfo.displayIcon) {
+            imageUrl = skinInfo.displayIcon;
+            displayName = skinInfo.displayName;
+            rarity = skinInfo.rarity;
+            logger.info(`[SkinsGrid] ✅ Skin encontrada no cache: ${skin.name} -> ${skinInfo.displayName} (${skinInfo.rarity})`);
           } else {
-            logger.warn(`[SkinsGrid] Não foi possível baixar imagem para: ${skin.name}`);
+            logger.warn(`[SkinsGrid] ⚠️ Skin não encontrada no cache: ${skin.name}`);
           }
+        }
+
+        // Se encontrou imagem, adicionar à lista
+        if (imageUrl) {
+          processedSkins.push({
+            name: displayName,
+            imageUrl: imageUrl,
+            rarity: rarity,
+          });
         } else {
-          logger.warn(`[SkinsGrid] Skin não encontrada no cache: ${skin.name}`);
+          logger.warn(`[SkinsGrid] ⚠️ Nenhuma imagem encontrada para skin: ${skin.name}`);
         }
       } catch (error: any) {
         logger.error(`[SkinsGrid] Erro ao processar skin ${skin.name}: ${error.message}`);
@@ -194,13 +172,14 @@ export class SkinsGridGenerator {
 
   /**
    * Gera imagem grid com todas as skins
+   * Carrega imagens diretamente de URLs (sem download/cache)
    */
   async generateSkinsGridImage(skins: SkinData[], gridCols: number = GRID_COLS): Promise<Buffer | null> {
     try {
       logger.info(`[SkinsGrid] Gerando grid para ${skins.length} skins...`);
 
-      // Processar skins (buscar informações e baixar imagens)
-      let processedSkins = await this.processSkins(skins);
+      // Processar skins (buscar informações - URLs já estão no cache)
+      let processedSkins = this.processSkins(skins);
 
       if (processedSkins.length === 0) {
         logger.warn('[SkinsGrid] Nenhuma skin processada com sucesso');
@@ -209,6 +188,8 @@ export class SkinsGridGenerator {
 
       // Ordenar por raridade e limitar a 15
       processedSkins = this.sortSkinsByRarity(processedSkins).slice(0, 15);
+
+      logger.info(`[SkinsGrid] ${processedSkins.length} skins processadas, gerando grid...`);
 
       // Calcular dimensões do grid
       const rows = Math.ceil(processedSkins.length / gridCols);
@@ -235,8 +216,29 @@ export class SkinsGridGenerator {
         const y = row * (CARD_HEIGHT + CARD_PADDING);
 
         try {
-          // Carregar imagem
-          const image = await loadImage(skin.imagePath);
+          // Carregar imagem com retry e tratamento de erro robusto
+          const image = await this.loadImageWithRetry(skin.imageUrl, skin.name, 3);
+          
+          if (!image) {
+            logger.warn(`[SkinsGrid] ⚠️ Não foi possível carregar imagem para ${skin.name}, pulando...`);
+            // Desenhar card vazio com borda
+            const borderColor = RARITY_COLORS[skin.rarity] || RARITY_COLORS['Unknown'];
+            ctx.fillStyle = borderColor;
+            ctx.fillRect(x, y, CARD_WIDTH, CARD_HEIGHT);
+            ctx.fillStyle = '#2A2A2E';
+            ctx.fillRect(
+              x + BORDER_WIDTH,
+              y + BORDER_WIDTH,
+              CARD_WIDTH - BORDER_WIDTH * 2,
+              CARD_HEIGHT - BORDER_WIDTH * 2
+            );
+            // Desenhar texto "Sem imagem"
+            ctx.fillStyle = '#808080';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Sem imagem', x + CARD_WIDTH / 2, y + CARD_HEIGHT / 2);
+            continue;
+          }
           
           // Desenhar borda colorida
           const borderColor = RARITY_COLORS[skin.rarity] || RARITY_COLORS['Unknown'];
@@ -274,8 +276,19 @@ export class SkinsGridGenerator {
 
           logger.info(`[SkinsGrid] ✅ Skin ${i + 1}/${processedSkins.length} desenhada: ${skin.name}`);
         } catch (error: any) {
-          logger.error(`[SkinsGrid] Erro ao desenhar skin ${skin.name}: ${error.message}`);
-          // Continuar com próxima skin mesmo se esta falhar
+          logger.error(`[SkinsGrid] ❌ Erro ao carregar/desenhar skin ${skin.name}: ${error.message}`);
+          logger.error(`[SkinsGrid] URL: ${skin.imageUrl}`);
+          // Desenhar card vazio com borda em caso de erro
+          const borderColor = RARITY_COLORS[skin.rarity] || RARITY_COLORS['Unknown'];
+          ctx.fillStyle = borderColor;
+          ctx.fillRect(x, y, CARD_WIDTH, CARD_HEIGHT);
+          ctx.fillStyle = '#2A2A2E';
+          ctx.fillRect(
+            x + BORDER_WIDTH,
+            y + BORDER_WIDTH,
+            CARD_WIDTH - BORDER_WIDTH * 2,
+            CARD_HEIGHT - BORDER_WIDTH * 2
+          );
         }
       }
 
@@ -285,10 +298,9 @@ export class SkinsGridGenerator {
 
       return buffer;
     } catch (error: any) {
-      logger.error(`[SkinsGrid] Erro ao gerar grid: ${error.message}`);
+      logger.error(`[SkinsGrid] ❌ Erro ao gerar grid: ${error.message}`);
       logger.error(`[SkinsGrid] Stack: ${error.stack}`);
       return null;
     }
   }
 }
-

@@ -68,31 +68,11 @@ async function renderAccountsList(
       return;
     }
 
-    // Filtrar apenas contas publicadas nas últimas 48 horas
-    const now = Date.now();
-    const maxAge = 48 * 60 * 60 * 1000; // 48 horas em milissegundos
-    const recentAccounts = response.items.filter(account => {
-      if (!account.published_at) return false;
-      const publishedTime = new Date(account.published_at).getTime();
-      const age = now - publishedTime;
-      return age <= maxAge; // Apenas contas com menos de 48 horas
-    });
-
-    if (recentAccounts.length === 0) {
-      logger.info('Nenhuma conta recente encontrada (últimas 48h)');
-      const content = '❌ Nenhuma conta encontrada publicada nas últimas 48 horas com os filtros especificados.';
-      if ('editReply' in interactionOrMessage) {
-        await interactionOrMessage.editReply({ content });
-      } else {
-        await interactionOrMessage.edit({ content });
-      }
-      return;
-    }
-
+    // Usar todas as contas retornadas (removido filtro de 48h que era muito restritivo)
     const quantidade = filters.per_page || 10;
-    const accountsToShow = recentAccounts.slice(0, Math.min(quantidade, 20));
+    const accountsToShow = response.items.slice(0, Math.min(quantidade, 20));
     
-    logger.info(`Filtradas ${recentAccounts.length} contas recentes (últimas 48h) de ${response.items.length} total`);
+    logger.info(`Usando ${accountsToShow.length} conta(s) de ${response.items.length} total encontradas`);
     
     logger.info(`Preparando para enviar ${accountsToShow.length} conta(s)...`);
 
@@ -236,19 +216,29 @@ export async function execute(
 ): Promise<void> {
   logger.info(`Executando comando /contas para usuário ${interaction.user.tag}`);
   
-  try {
-    await interaction.deferReply();
-  } catch (error: any) {
-    logger.error('Erro ao fazer deferReply', error);
+  // Verificar se já foi deferido antes de tentar novamente
+  if (!interaction.deferred && !interaction.replied) {
     try {
-      await interaction.reply({
-        content: '❌ Erro ao processar comando. Verifique as permissões do bot.',
-        ephemeral: true,
-      });
-    } catch (replyError) {
-      logger.error('Erro ao enviar resposta de erro', replyError);
+      await interaction.deferReply();
+    } catch (error: any) {
+      // Se já foi deferido por outro handler, continuar
+      if (error.code === 40060) {
+        logger.warn('Interação já foi deferida, continuando...');
+      } else {
+        logger.error('Erro ao fazer deferReply', error);
+        try {
+          if (!interaction.replied) {
+            await interaction.reply({
+              content: '❌ Erro ao processar comando. Verifique as permissões do bot.',
+              ephemeral: true,
+            });
+          }
+        } catch (replyError) {
+          logger.error('Erro ao enviar resposta de erro', replyError);
+        }
+        return;
+      }
     }
-    return;
   }
 
   const quantidade = interaction.options.getInteger('quantidade') || 10;

@@ -44,37 +44,75 @@ export async function execute(
   const action = interaction.options.getString('action', true);
 
   if (action === 'start') {
+    // Verificar se já foi deferido antes de tentar novamente
+    if (!interaction.deferred && !interaction.replied) {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+      } catch (error: any) {
+        // Se já foi deferido, continuar
+        if (error.code === 40060) {
+          logger.warn('Interação já foi deferida, continuando...');
+        } else {
+          logger.error('Erro ao fazer deferReply', error);
+          try {
+            if (!interaction.replied) {
+              await interaction.reply({
+                content: '❌ Erro ao processar comando.',
+                ephemeral: true,
+              });
+            }
+          } catch {}
+          return;
+        }
+      }
+    }
+
     // Usar o canal onde o comando foi executado
     const channelId = interaction.channelId;
 
     if (!channelId) {
-      await interaction.reply({
-        content: '❌ **Erro**\n\nNão foi possível identificar o canal. Execute o comando em um canal de texto.',
-        ephemeral: true,
-      });
+      try {
+        await interaction.editReply({
+          content: '❌ **Erro**\n\nNão foi possível identificar o canal. Execute o comando em um canal de texto.',
+        });
+      } catch {
+        await interaction.followUp({
+          content: '❌ **Erro**\n\nNão foi possível identificar o canal. Execute o comando em um canal de texto.',
+          ephemeral: true,
+        });
+      }
       return;
     }
 
     if (!client) {
-      await interaction.reply({
-        content: '❌ Cliente Discord não disponível.',
-        ephemeral: true,
-      });
+      try {
+        await interaction.editReply({
+          content: '❌ Cliente Discord não disponível.',
+        });
+      } catch {
+        await interaction.followUp({
+          content: '❌ Cliente Discord não disponível.',
+          ephemeral: true,
+        });
+      }
       return;
     }
 
     // Verificar se o canal é um TextChannel
     const channel = await client.channels.fetch(channelId);
     if (!channel || !channel.isTextBased()) {
-      await interaction.reply({
-        content: '❌ **Erro**\n\nO canal precisa ser um canal de texto.',
-        ephemeral: true,
-      });
+      try {
+        await interaction.editReply({
+          content: '❌ **Erro**\n\nO canal precisa ser um canal de texto.',
+        });
+      } catch {
+        await interaction.followUp({
+          content: '❌ **Erro**\n\nO canal precisa ser um canal de texto.',
+          ephemeral: true,
+        });
+      }
       return;
     }
-
-    // Deferir resposta imediatamente para evitar timeout
-    await interaction.deferReply({ ephemeral: true });
 
     try {
       const result = await accountPublisher.start(client, channelId);
@@ -124,8 +162,28 @@ export async function execute(
       }
     }
   } else if (action === 'stop') {
-    // Deferir resposta imediatamente para evitar timeout
-    await interaction.deferReply({ ephemeral: true });
+    // Verificar se já foi deferido antes de tentar novamente
+    if (!interaction.deferred && !interaction.replied) {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+      } catch (error: any) {
+        // Se já foi deferido, continuar
+        if (error.code === 40060) {
+          logger.warn('Interação já foi deferida, continuando...');
+        } else {
+          logger.error('Erro ao fazer deferReply', error);
+          try {
+            if (!interaction.replied) {
+              await interaction.reply({
+                content: '❌ Erro ao processar comando.',
+                ephemeral: true,
+              });
+            }
+          } catch {}
+          return;
+        }
+      }
+    }
 
     try {
       const result = accountPublisher.stop();

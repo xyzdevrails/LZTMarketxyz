@@ -328,12 +328,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       try {
         if (interaction.replied || interaction.deferred) {
-          await interaction.followUp(errorMessage);
+          // Se já foi deferido, usar editReply ou followUp
+          try {
+            await interaction.editReply(errorMessage);
+          } catch {
+            // Se editReply falhar, tentar followUp
+            await interaction.followUp(errorMessage);
+          }
         } else {
           await interaction.reply(errorMessage);
         }
-      } catch (replyError) {
-        logger.error('Erro ao enviar mensagem de erro', replyError);
+      } catch (replyError: any) {
+        // Se já foi respondido, não fazer nada
+        if (replyError.code !== 40060) {
+          logger.error('Erro ao enviar mensagem de erro', replyError);
+        }
       }
     }
   } else if (interaction.isButton()) {

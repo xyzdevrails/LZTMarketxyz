@@ -220,6 +220,25 @@ export class SkinsCacheService {
   }
 
   /**
+   * Busca informações de uma skin específica por UUID
+   */
+  getSkinInfoByUuid(uuid: string): ValorantSkin | null {
+    if (this.cache.size === 0) {
+      logger.warn('[SkinsCache] Cache vazio, chame loadValorantSkinsCache() primeiro');
+      return null;
+    }
+
+    const foundSkin = this.cache.get(uuid);
+    if (foundSkin) {
+      logger.info(`[SkinsCache] Skin encontrada por UUID: ${uuid} -> ${foundSkin.displayName}`);
+      return foundSkin;
+    }
+
+    logger.warn(`[SkinsCache] Nenhuma skin encontrada para UUID: ${uuid}`);
+    return null;
+  }
+
+  /**
    * Busca informações de uma skin específica pelo nome
    */
   getSkinInfo(skinName: string): ValorantSkin | null {

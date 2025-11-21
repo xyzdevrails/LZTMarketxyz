@@ -24,7 +24,28 @@ export async function execute(
   lztService: LZTService,
   cacheService?: any
 ): Promise<void> {
-  await interaction.deferReply();
+  // Verificar se já foi deferido antes de tentar novamente
+  if (!interaction.deferred && !interaction.replied) {
+    try {
+      await interaction.deferReply();
+    } catch (error: any) {
+      // Se já foi deferido por outro handler, continuar
+      if (error.code === 40060) {
+        logger.warn('Interação já foi deferida, continuando...');
+      } else {
+        logger.error('Erro ao fazer deferReply', error);
+        try {
+          if (!interaction.replied) {
+            await interaction.reply({
+              content: '❌ Erro ao processar comando.',
+              ephemeral: true,
+            });
+          }
+        } catch {}
+        return;
+      }
+    }
+  }
 
   try {
     const itemId = interaction.options.getInteger('id', true);
