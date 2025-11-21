@@ -378,7 +378,7 @@ export async function createAccountEmbeds(
 
       if (imageFromLZT) {
         skinImageUrl = imageFromLZT;
-        logger.info(`[DEBUG] ✅ Imagem obtida via LZT /image: ${skinImageUrl.substring(0, 50)}...`);
+        logger.info(`[DEBUG] ✅ Imagem obtida via LZT /image: ${imageFromLZT.substring(0, 50)}...`);
       } else {
         logger.warn(`[DEBUG] ⚠️ Endpoint /image não retornou nenhuma imagem utilizável`);
       }
